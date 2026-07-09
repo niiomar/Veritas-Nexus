@@ -37,7 +37,7 @@ We utilize Docker Compose to spin up the modular monolith infrastructure (FastAP
    git clone [https://github.com/your-org/veritas-nexus.git](https://github.com/your-org/veritas-nexus.git)
    cd veritas-nexus
    ```
-2. **Configure Environment Variables:**
+**Configure Environment Variables:**
 Create a .env file in the root directory.
 ```bash
 POSTGRES_USER=postgres
@@ -46,7 +46,7 @@ POSTGRES_DB=veritas_nexus
 DATABASE_URL=postgresql+asyncpg://postgres:your_secure_password@nexus_db:5432/veritas_nexus
 ```
 
-3. **Spin up the containers:**
+**Spin up the containers:**
 ```bash
 docker-compose up -d --build
 ```
