@@ -1,0 +1,11 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+venv/
+.docker/
+*.log
+pg_data/
+vault/
+nexus_storage_vault/
+nexus_db_data/
