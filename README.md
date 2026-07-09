@@ -2,7 +2,7 @@
 
 **Unified Digital Media Intelligence Platform**
 
-Veritas Nexus is an enterprise-grade digital evidence orchestration platform developed for the National Signals Bureau (NSB) of Ghana. It transitions isolated forensic scripts into a unified, operational workflow by providing policy-driven correlation of machine learning deepfake detection (ViT-CORE-FORENSICS) and cryptographic provenance verification (C2PA-Veritas).
+Veritas Nexus is an enterprise-grade digital evidence orchestration platform developed for an organization. It transitions isolated forensic scripts into a unified, operational workflow by providing policy-driven correlation of machine learning deepfake detection (ViT-CORE-FORENSICS) and cryptographic provenance verification (C2PA-Veritas).
 
 ## Architectural Philosophy
 
