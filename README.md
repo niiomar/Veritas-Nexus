@@ -36,3 +36,18 @@ We utilize Docker Compose to spin up the modular monolith infrastructure (FastAP
    ```bash
    git clone [https://github.com/your-org/veritas-nexus.git](https://github.com/your-org/veritas-nexus.git)
    cd veritas-nexus
+
+2. **Configure Environment Variables:**
+Create a .env file in the root directory.
+```bash
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=your_secure_password
+POSTGRES_DB=veritas_nexus
+DATABASE_URL=postgresql+asyncpg://postgres:your_secure_password@nexus_db:5432/veritas_nexus
+```
+
+3. **Spin up the containers:**
+```bash
+docker-compose up -d --build
+```
+This launches nexus_api (FastAPI) on port 8000 and nexus_db (PostgreSQL) on port 5432. It also provisions local volumes for database data and physical evidence storage (nexus_storage_vault).
