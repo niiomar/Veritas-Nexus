@@ -26,7 +26,7 @@ The monorepo is organized by architectural boundary rather than feature:
 
 ## Local Development Setup
 
-We utilize Docker Compose to spin up the modular monolith infrastructure (FastAPI Gateway + PostgreSQL Database).
+We utilize Docker Compose to spin up the modular monolith infrastructure (FastAPI Gateway + PostgreSQL Database)
 
 1. **Clone the repository:**
    ```bash
