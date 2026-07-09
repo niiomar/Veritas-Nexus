@@ -32,11 +32,11 @@ We utilize Docker Compose to spin up the modular monolith infrastructure (FastAP
 
 ### 1. Backend Infrastructure (Docker)
 
-1. **Clone the repository:**
+**Clone the repository:**
    ```bash
    git clone [https://github.com/your-org/veritas-nexus.git](https://github.com/your-org/veritas-nexus.git)
    cd veritas-nexus
-
+   ```
 2. **Configure Environment Variables:**
 Create a .env file in the root directory.
 ```bash
