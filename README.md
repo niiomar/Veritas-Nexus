@@ -24,9 +24,13 @@ The monorepo is organized by architectural boundary rather than feature:
 * `api/`: The FastAPI delivery mechanism.
 * `frontend/`: The React/Vite Analyst Workstation dashboard.
 
+---
+
 ## Local Development Setup
 
-We utilize Docker Compose to spin up the modular monolith infrastructure (FastAPI Gateway + PostgreSQL Database)
+We utilize Docker Compose to spin up the modular monolith infrastructure (FastAPI Gateway + PostgreSQL Database), and Vite for the frontend React application.
+
+### 1. Backend Infrastructure (Docker)
 
 1. **Clone the repository:**
    ```bash
