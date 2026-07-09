@@ -51,3 +51,17 @@ DATABASE_URL=postgresql+asyncpg://postgres:your_secure_password@nexus_db:5432/ve
 docker-compose up -d --build
 ```
 This launches nexus_api (FastAPI) on port 8000 and nexus_db (PostgreSQL) on port 5432. It also provisions local volumes for database data and physical evidence storage (nexus_storage_vault).
+
+**Initialize the Database Schema:**
+The persistence layer relies on specific core tables (cases, evidence, audit_events). Ensure your database is seeded using Alembic, or by manually injecting the core schemas via the DB container:
+```bash
+docker exec -it nexus_api alembic upgrade head
+```
+
+### 2. Frontend Analyst Workstation (Vite/React)
+
+The frontend is a React application heavily utilizing TypeScript and lucide-react for UI components.
+**Navigate to the frontend directory:**
+```bash
+cd frontend
+```
