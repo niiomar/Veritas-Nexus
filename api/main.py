@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Veritas Nexus API starting up...")
+
     
     # 1. Fire up the ViT-CORE-FORENSICS background worker
     worker_task = asyncio.create_task(poll_analysis_jobs())
