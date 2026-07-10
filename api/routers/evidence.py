@@ -2,6 +2,7 @@ import uuid
 import shutil
 import hashlib
 from pathlib import Path
+from sqlalchemy import select
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -92,3 +93,32 @@ async def ingest_evidence(
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"Ingestion failed: {str(e)}")
+
+
+@router.get("/")
+async def list_evidence(db: AsyncSession = Depends(get_db)):
+    try:
+        # Query the evidence and join it with the analysis jobs to get the status
+        stmt = (
+            select(EvidenceORM, AnalysisJobORM.status)
+            .join(AnalysisJobORM, EvidenceORM.id == AnalysisJobORM.evidence_id)
+            .order_by(EvidenceORM.uploaded_at.desc())
+        )
+        result = await db.execute(stmt)
+        records = result.all()
+
+        # Format the output into a clean JSON array for the React frontend
+        evidence_list = []
+        for evidence, status in records:
+            evidence_list.append({
+                "id": str(evidence.id),
+                "filename": evidence.original_filename,
+                "sha256": evidence.sha256,
+                "status": status,
+                "uploaded_at": evidence.uploaded_at.isoformat(),
+            })
+
+        return {"evidence": evidence_list}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch library: {str(e)}")
