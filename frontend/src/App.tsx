@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Shield, UploadCloud, Activity, Database, Clock, Fingerprint, Lock, CheckCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Shield, UploadCloud, Activity, Database, Clock, Fingerprint, Lock, CheckCircle, FileText } from 'lucide-react';
 
 const embeddedStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Montserrat:wght@600;700&display=swap');
@@ -50,6 +50,20 @@ const embeddedStyles = `
   .timeline-time { font-family: monospace; font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem; }
   .timeline-action { font-weight: 600; font-size: 0.95rem; }
   .timeline-context { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem; }
+
+  /* New Table Styles */
+  .table-container { margin-top: 2rem; }
+  .data-table { width: 100%; border-collapse: collapse; text-align: left; }
+  .data-table th { padding: 1rem; border-bottom: 1px solid var(--border-color); color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .data-table td { padding: 1rem; border-bottom: 1px solid var(--border-color); font-size: 0.9rem; }
+  .data-table tr:last-child td { border-bottom: none; }
+  
+  .badge { padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; display: inline-block; }
+  .badge.pending { background-color: rgba(245, 158, 11, 0.1); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.2); }
+  .badge.processing { background-color: rgba(59, 130, 246, 0.1); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.2); }
+  .badge.completed { background-color: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2); }
+  
+  .hash-cell { font-family: monospace; color: var(--text-muted); max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
 `;
 
 function App() {
@@ -57,8 +71,30 @@ function App() {
   const [isUploading, setIsUploading] = useState(false);
   const [ingestResult, setIngestResult] = useState<{ sha256: string; evidence_id: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  
+  // State for the Evidence Library
+  const [evidenceLibrary, setEvidenceLibrary] = useState<any[]>([]);
 
+  // The Hardcoded Case ID (Required for DB Foreign Key)
   const ACTIVE_CASE_ID = "ced83594-cd59-4ca9-8a0c-6733fd93dc4c"; 
+
+  // Function to pull the library from FastAPI
+  const fetchLibrary = async () => {
+    try {
+      const response = await fetch("http://localhost:8000/api/v1/evidence/");
+      if (response.ok) {
+        const data = await response.json();
+        setEvidenceLibrary(data.evidence || []);
+      }
+    } catch (err) {
+      console.error("Failed to sync library:", err);
+    }
+  };
+
+  // Fetch the library the moment the dashboard loads
+  useEffect(() => {
+    fetchLibrary();
+  }, []);
 
   const handleIngest = async () => {
     if (!file) {
@@ -81,7 +117,6 @@ function App() {
       });
 
       if (!response.ok) {
-        // Extract the actual traceback/error message from FastAPI's JSON response
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.detail || `Upload failed with status: ${response.status}`);
       }
@@ -91,6 +126,10 @@ function App() {
         sha256: data.sha256,
         evidence_id: data.evidence_id
       });
+
+      // Clear the file selection and refresh the table instantly
+      setFile(null); 
+      fetchLibrary(); 
       
     } catch (err: any) {
       setError(err.message || "Failed to connect to Nexus Backend.");
@@ -101,9 +140,6 @@ function App() {
 
   return (
     <>
-      {/* This style tag forcefully injects the CSS straight into the DOM. 
-        It bypasses Webpack/Vite loaders entirely. 
-      */}
       <style dangerouslySetInnerHTML={{ __html: embeddedStyles }} />
       
       <div className="dashboard-container">
@@ -258,6 +294,51 @@ function App() {
             </div>
           </aside>
         </div>
+
+        <div className="panel table-container">
+          <div className="panel-header" style={{ marginBottom: '0' }}>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <FileText size={20} color="#3b82f6" />
+              Active Case Evidence Library
+            </h3>
+          </div>
+          
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Filename</th>
+                <th>Cryptographic Hash (SHA-256)</th>
+                <th>Timestamp (UTC)</th>
+                <th>Analysis Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {evidenceLibrary.length === 0 ? (
+                <tr>
+                  <td colSpan={4} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                    No evidence ingested yet.
+                  </td>
+                </tr>
+              ) : (
+                evidenceLibrary.map((item) => (
+                  <tr key={item.id}>
+                    <td style={{ fontWeight: 500, color: 'var(--text-main)' }}>{item.filename}</td>
+                    <td><span className="hash-cell" title={item.sha256}>{item.sha256}</span></td>
+                    <td style={{ color: 'var(--text-muted)' }}>
+                      {new Date(item.uploaded_at).toLocaleString()}
+                    </td>
+                    <td>
+                      <span className={`badge ${item.status.toLowerCase()}`}>
+                        {item.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+        
       </div>
     </>
   );
