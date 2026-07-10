@@ -1,19 +1,17 @@
 import uuid
 import shutil
 import hashlib
+import json
 from pathlib import Path
-from sqlalchemy import select
+from sqlalchemy import text
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Assuming you have a standard database dependency
 from api.dependencies import get_db_session as get_db
 from infrastructure.persistence.models import EvidenceORM, AnalysisJobORM, AuditEventORM
 
 router = APIRouter(prefix="/api/v1/evidence", tags=["Evidence"])
-
-# This path corresponds to your nexus_storage_vault mount in docker-compose
 STORAGE_VAULT = Path("/vault") 
 
 @router.post("/")
@@ -24,30 +22,24 @@ async def ingest_evidence(
     db: AsyncSession = Depends(get_db)
 ):
     try:
-        # 1. Storage Setup
         STORAGE_VAULT.mkdir(parents=True, exist_ok=True)
         evidence_id = uuid.uuid4()
         
-        # Sanitize and create a unique storage path
         safe_filename = "".join(c for c in file.filename if c.isalnum() or c in "._-")
         storage_filename = f"{evidence_id}_{safe_filename}"
         file_path = STORAGE_VAULT / storage_filename
 
-        # 2. Save Physical File to nexus_storage_vault
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        # 3. Cryptographic Hashing (SHA-256 chunked for memory safety on large files)
         sha256_hash = hashlib.sha256()
         with open(file_path, "rb") as f:
             for byte_block in iter(lambda: f.read(4096), b""):
                 sha256_hash.update(byte_block)
         file_hash = sha256_hash.hexdigest()
 
-        # 4. Database Persistence
         now = datetime.now(timezone.utc)
         
-        # A. Save to core.evidence
         evidence_record = EvidenceORM(
             id=evidence_id,
             case_id=case_id,
@@ -62,7 +54,6 @@ async def ingest_evidence(
         db.add(evidence_record)
         await db.flush()
 
-        # B. Trigger Analysis (Queue in analysis_jobs)
         analysis_job = AnalysisJobORM(
             id=uuid.uuid4(),
             evidence_id=evidence_id,
@@ -71,7 +62,6 @@ async def ingest_evidence(
         )
         db.add(analysis_job)
 
-        # C. Audit Trail (Maintain strict chain of custody)
         audit_event = AuditEventORM(
             id=uuid.uuid4(),
             resource_id=evidence_id,
@@ -98,24 +88,30 @@ async def ingest_evidence(
 @router.get("/")
 async def list_evidence(db: AsyncSession = Depends(get_db)):
     try:
-        # Query the evidence and join it with the analysis jobs to get the status
-        stmt = (
-            select(EvidenceORM, AnalysisJobORM.status)
-            .join(AnalysisJobORM, EvidenceORM.id == AnalysisJobORM.evidence_id)
-            .order_by(EvidenceORM.uploaded_at.desc())
-        )
+        # Bypassing the ORM limitation with a highly efficient raw SQL join
+        stmt = text("""
+            SELECT e.id, e.original_filename, e.sha256, e.uploaded_at, j.status, j.ai_report
+            FROM core.evidence e
+            JOIN analysis.analysis_jobs j ON e.id = j.evidence_id
+            ORDER BY e.uploaded_at DESC
+        """)
         result = await db.execute(stmt)
-        records = result.all()
+        records = result.mappings().all()
 
-        # Format the output into a clean JSON array for the React frontend
         evidence_list = []
-        for evidence, status in records:
+        for row in records:
+            # Safely handle the JSON payload whether asyncpg returns it as a dict or a string
+            report = row.get("ai_report")
+            if isinstance(report, str):
+                report = json.loads(report)
+
             evidence_list.append({
-                "id": str(evidence.id),
-                "filename": evidence.original_filename,
-                "sha256": evidence.sha256,
-                "status": status,
-                "uploaded_at": evidence.uploaded_at.isoformat(),
+                "id": str(row["id"]),
+                "filename": row["original_filename"],
+                "sha256": row["sha256"],
+                "status": row["status"],
+                "uploaded_at": row["uploaded_at"].isoformat(),
+                "ai_report": report
             })
 
         return {"evidence": evidence_list}
