@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Assuming you have a standard database dependency
-from api.dependencies import get_db 
+from api.dependencies import get_db_session as get_db
 from infrastructure.persistence.models import EvidenceORM, AnalysisJobORM, AuditEventORM
 
 router = APIRouter(prefix="/api/v1/evidence", tags=["Evidence"])
@@ -59,6 +59,7 @@ async def ingest_evidence(
             metadata_dict={"content_type": file.content_type}
         )
         db.add(evidence_record)
+        await db.flush()
 
         # B. Trigger Analysis (Queue in analysis_jobs)
         analysis_job = AnalysisJobORM(
