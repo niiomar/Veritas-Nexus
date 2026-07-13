@@ -32,6 +32,10 @@ services:
     environment:
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres_password@db:5432/veritas_nexus
       - ENVIRONMENT=development
+    # --- THIS IS THE FIX ---
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # -----------------------
     depends_on:
       db:
         condition: service_healthy

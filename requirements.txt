@@ -16,3 +16,4 @@ psycopg2-binary==2.9.9
 # Utilities
 python-dotenv==1.0.1
 uuid6==2024.1.12
+requests>=2.31.0
