@@ -1,11 +1,5 @@
-<<<<<<< HEAD
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { AlertCircle } from 'lucide-react';
-=======
-// src/App.tsx
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { User, Network, Plus, Globe, FileText, ChevronRight, AlertCircle } from 'lucide-react';
->>>>>>> 79c5f88650c1859b71654981f454f8077097e16a
 
 import './index.css';
 import type { Case, Evidence, EngineStatus } from './types';
@@ -14,10 +8,6 @@ import { AssessmentEngine } from './services/assessment';
 
 import { GlobalCommandBar } from './components/GlobalCommandBar';
 import { Sidebar } from './components/Sidebar';
-<<<<<<< HEAD
-=======
-import { TelemetrySidebar } from './components/TelemetrySidebar';
->>>>>>> 79c5f88650c1859b71654981f454f8077097e16a
 import { IngestionPipeline } from './components/IngestionPipeline';
 import { DecisionWorkspace } from './components/DecisionWorkspace';
 
@@ -35,15 +25,8 @@ export default function App() {
   const [selectedEvidence, setSelectedEvidence] = useState<Evidence | null>(null);
   const [activeCase, setActiveCase] = useState<Case>(INITIAL_CASES[0]);
   
-<<<<<<< HEAD
   const [engineStatus, setEngineStatus] = useState<EngineStatus>({ vit: 'ONLINE', c2pa: 'ONLINE' });
 
-=======
-  // Dynamic Engine Telemetry State
-  const [engineStatus, setEngineStatus] = useState<EngineStatus>({ vit: 'ONLINE', c2pa: 'ONLINE' });
-
-  // Poll Database Library
->>>>>>> 79c5f88650c1859b71654981f454f8077097e16a
   const fetchLibrary = useCallback(async () => {
     try {
       const evidence = await EvidenceAPI.fetchLibrary();
@@ -54,10 +37,6 @@ export default function App() {
     }
   }, []);
 
-<<<<<<< HEAD
-=======
-  // Poll Engine Cluster Health
->>>>>>> 79c5f88650c1859b71654981f454f8077097e16a
   const fetchTelemetry = useCallback(async () => {
     const status = await EvidenceAPI.checkHealth();
     setEngineStatus(status);
@@ -67,10 +46,6 @@ export default function App() {
     fetchLibrary();
     fetchTelemetry();
     
-<<<<<<< HEAD
-=======
-    // Check DB every 3 seconds, Check Engines every 10 seconds
->>>>>>> 79c5f88650c1859b71654981f454f8077097e16a
     const dbInterval = setInterval(fetchLibrary, 3000);
     const telemetryInterval = setInterval(fetchTelemetry, 10000);
     
@@ -91,18 +66,11 @@ export default function App() {
   }, []);
 
   const filteredEvidence = evidenceLibrary.filter(item => item.case_id === activeCase.id);
-<<<<<<< HEAD
   
   const metrics = useMemo(() => filteredEvidence.reduce((acc, curr) => {
     const ast = AssessmentEngine.evaluate(curr);
     if (ast.type === 'crit') acc.critical++;
     if (ast.type === 'warn') acc.conflicts++;
-=======
-  const metrics = useMemo(() => filteredEvidence.reduce((acc, curr) => {
-    const ast = AssessmentEngine.evaluate(curr);
-    if (ast.type === 'crit') acc.critical++;
-    if (ast.type === 'review') acc.conflicts++;
->>>>>>> 79c5f88650c1859b71654981f454f8077097e16a
     return acc;
   }, { critical: 0, conflicts: 0 }), [filteredEvidence]);
 
@@ -114,7 +82,6 @@ export default function App() {
         <IngestionPipeline file={file} activeCase={activeCase} onComplete={handleUploadComplete} onError={handleUploadError} />
       )}
 
-<<<<<<< HEAD
       <div className="app-container" style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', backgroundColor: '#050505' }}>
         <GlobalCommandBar />
 
@@ -238,76 +205,3 @@ export default function App() {
     </>
   );
 }
-=======
-      {selectedEvidence && (
-        <DecisionWorkspace evidence={selectedEvidence} onClose={() => setSelectedEvidence(null)} />
-      )}
-
-      <div className="app-container">
-        <GlobalCommandBar />
-
-        <div className="main-layout">
-          <Sidebar cases={INITIAL_CASES} activeCase={activeCase} onSelectCase={(c) => { setActiveCase(c); setSelectedEvidence(null); }} />
-
-          <main className="workspace-core">
-            <div className="investigation-arena">
-              
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
-                  <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-                    <span className="badge b-crit">THREAT LEVEL: {activeCase.priority.toUpperCase()}</span>
-                    <span className="badge b-neutral"><User size={10} style={{display:'inline', marginRight:'4px'}}/> LEAD: {activeCase.analyst.toUpperCase()}</span>
-                  </div>
-                  <div className="case-id-large" style={{ fontSize: '2.5rem' }}>{activeCase.alias}</div>
-                  <div style={{ fontSize: '1.2rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>{activeCase.name}</div>
-                </div>
-                <div>
-                  <input type="file" id="file-upload" style={{ display: 'none' }} onChange={(e) => { if(e.target.files?.[0]) { setFile(e.target.files[0]); setIsUploading(true); } }} />
-                  <button className="btn-sys" onClick={() => document.getElementById('file-upload')?.click()}><Plus size={16} /> INGEST PAYLOAD</button>
-                </div>
-              </div>
-
-              <div className="panel">
-                <div className="panel-header"><Network size={14}/> EVIDENCE RELATIONSHIP GRAPH</div>
-                <div className="panel-body" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '150px', backgroundImage: 'radial-gradient(circle at 50% 50%, var(--border-color) 1px, transparent 1px)', backgroundSize: '20px 20px' }}>
-                   <div style={{ color: 'var(--text-faint)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Globe size={16}/> Graph visualization mapping initialized for {filteredEvidence.length} assets.</div>
-                </div>
-              </div>
-
-              <div className="panel">
-                <div className="panel-header"><FileText size={14}/> EVIDENCE INTELLIGENCE LEDGER</div>
-                <div>
-                  {filteredEvidence.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-faint)', fontSize: '0.85rem' }}>Awaiting payload ingestion.</div>
-                  ) : (
-                    filteredEvidence.map((item) => {
-                      const ast = AssessmentEngine.evaluate(item);
-                      const isEval = item.status !== 'COMPLETED' || !item.ai_report;
-                      return (
-                        <div key={item.id} className="ledger-commit" role="button" tabIndex={0} onClick={() => setSelectedEvidence(item)} onKeyDown={(e) => { if (e.key === 'Enter') setSelectedEvidence(item); }}>
-                          <div className="commit-icon" style={{ color: isEval ? 'var(--text-muted)' : `var(--c-${ast.type})`, background: isEval ? 'var(--text-muted)' : `var(--c-${ast.type})` }}></div>
-                          <div style={{ flex: '2', minWidth: 0 }}><div className="truncate" style={{ fontWeight: 600, fontSize: '0.9rem' }}>{item.filename.split('_').slice(1).join('_') || item.filename}</div><div className="mono truncate" style={{ fontSize: '0.65rem', color: 'var(--text-faint)', marginTop: '0.2rem' }}>{item.sha256}</div></div>
-                          <div style={{ flex: '1', display: 'flex', gap: '0.5rem' }}>
-                            {!isEval && item.ai_report?.deepfake_probability !== null && <span className="badge b-neural" title="ViT-CORE Processed">ViT</span>}
-                            {!isEval && item.ai_report?.c2pa_data?.is_signed && <span className="badge b-crypto" title="C2PA Validated">C2PA</span>}
-                          </div>
-                          <div style={{ flex: '1.5', textAlign: 'right' }}>
-                            {isEval ? <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }} className="animate-pulse">EVALUATING...</span> : <div><div style={{ fontWeight: 700, fontSize: '0.85rem', color: `var(--c-${ast.type})` }}>{ast.verdict}</div><div className="mono" style={{ fontSize: '0.65rem', color: 'var(--text-faint)' }}>CONF: {ast.conf}%</div></div>}
-                          </div>
-                          <div><ChevronRight size={16} color="var(--text-faint)" /></div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            </div>
-          </main>
-
-          <TelemetrySidebar metrics={metrics} engineStatus={engineStatus} />
-        </div>
-      </div>
-    </>
-  );
-}
->>>>>>> 79c5f88650c1859b71654981f454f8077097e16a
