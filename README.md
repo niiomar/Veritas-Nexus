@@ -2,7 +2,7 @@
 
 **Unified Digital Media Intelligence Platform**
 
-Veritas Nexus is an enterprise-grade digital evidence orchestration platform developed for the National Signals Bureau (NSB) of Ghana. It transitions isolated forensic scripts into a unified, operational workflow by providing policy-driven correlation of machine learning deepfake detection (ViT-CORE-FORENSICS) and cryptographic provenance verification (C2PA-Veritas).
+Veritas Nexus is an enterprise-grade digital evidence orchestration platform developed for an organization. It transitions isolated forensic scripts into a unified, operational workflow by providing policy-driven correlation of machine learning deepfake detection (ViT-CORE-FORENSICS) and cryptographic provenance verification (C2PA-Veritas).
 
 ## Architectural Philosophy
 
@@ -24,11 +24,44 @@ The monorepo is organized by architectural boundary rather than feature:
 * `api/`: The FastAPI delivery mechanism.
 * `frontend/`: The React/Vite Analyst Workstation dashboard.
 
+---
+
 ## Local Development Setup
 
-We utilize Docker Compose to spin up the modular monolith infrastructure (FastAPI Gateway + PostgreSQL Database).
+We utilize Docker Compose to spin up the modular monolith infrastructure (FastAPI Gateway + PostgreSQL Database), and Vite for the frontend React application.
 
-1. **Clone the repository:**
+### 1. Backend Infrastructure (Docker)
+
+**Clone the repository:**
    ```bash
    git clone [https://github.com/your-org/veritas-nexus.git](https://github.com/your-org/veritas-nexus.git)
    cd veritas-nexus
+   ```
+**Configure Environment Variables:**
+Create a .env file in the root directory.
+```bash
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=your_secure_password
+POSTGRES_DB=veritas_nexus
+DATABASE_URL=postgresql+asyncpg://postgres:your_secure_password@nexus_db:5432/veritas_nexus
+```
+
+**Spin up the containers:**
+```bash
+docker-compose up -d --build
+```
+This launches nexus_api (FastAPI) on port 8000 and nexus_db (PostgreSQL) on port 5432. It also provisions local volumes for database data and physical evidence storage (nexus_storage_vault).
+
+**Initialize the Database Schema:**
+The persistence layer relies on specific core tables (cases, evidence, audit_events). Ensure your database is seeded using Alembic, or by manually injecting the core schemas via the DB container:
+```bash
+docker exec -it nexus_api alembic upgrade head
+```
+
+### 2. Frontend Analyst Workstation (Vite/React)
+
+The frontend is a React application heavily utilizing TypeScript and lucide-react for UI components.
+**Navigate to the frontend directory:**
+```bash
+cd frontend
+```

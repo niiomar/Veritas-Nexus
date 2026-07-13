@@ -3,11 +3,14 @@ import uuid
 import shutil
 import hashlib
 import json
+<<<<<<< HEAD
 import base64
 import requests
 import logging
 import asyncio
 import traceback
+=======
+>>>>>>> 79c5f88650c1859b71654981f454f8077097e16a
 from pathlib import Path
 from sqlalchemy import text
 from datetime import datetime, timezone
@@ -18,9 +21,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.dependencies import get_db_session as get_db
 from infrastructure.persistence.models import EvidenceORM, AnalysisJobORM, AuditEventORM
 
+<<<<<<< HEAD
 # Setup logging
 logger = logging.getLogger("EvidenceRouter")
 
+=======
+>>>>>>> 79c5f88650c1859b71654981f454f8077097e16a
 router = APIRouter(prefix="/api/v1/evidence", tags=["Evidence"])
 STORAGE_VAULT = Path("/vault") 
 
@@ -103,8 +109,14 @@ async def ingest_evidence(
 @router.get("/")
 async def list_evidence(db: AsyncSession = Depends(get_db)):
     try:
+<<<<<<< HEAD
         stmt = text("""
             SELECT e.id, e.case_id, e.original_filename, e.sha256, e.uploaded_at, j.status, j.ai_report
+=======
+        # Bypassing the ORM limitation with a highly efficient raw SQL join
+        stmt = text("""
+            SELECT e.id, e.original_filename, e.sha256, e.uploaded_at, j.status, j.ai_report
+>>>>>>> 79c5f88650c1859b71654981f454f8077097e16a
             FROM core.evidence e
             JOIN analysis.analysis_jobs j ON e.id = j.evidence_id
             ORDER BY e.uploaded_at DESC
@@ -114,13 +126,20 @@ async def list_evidence(db: AsyncSession = Depends(get_db)):
 
         evidence_list = []
         for row in records:
+<<<<<<< HEAD
+=======
+            # Safely handle the JSON payload whether asyncpg returns it as a dict or a string
+>>>>>>> 79c5f88650c1859b71654981f454f8077097e16a
             report = row.get("ai_report")
             if isinstance(report, str):
                 report = json.loads(report)
 
             evidence_list.append({
                 "id": str(row["id"]),
+<<<<<<< HEAD
                 "case_id": str(row["case_id"]),
+=======
+>>>>>>> 79c5f88650c1859b71654981f454f8077097e16a
                 "filename": row["original_filename"],
                 "sha256": row["sha256"],
                 "status": row["status"],
@@ -132,6 +151,7 @@ async def list_evidence(db: AsyncSession = Depends(get_db)):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch library: {str(e)}")
+<<<<<<< HEAD
 
 
 @router.get("/{evidence_id}/download")
@@ -216,3 +236,5 @@ async def get_evidence_explainability_proxy(evidence_id: uuid.UUID, db: AsyncSes
     except Exception as e:
         logger.error(f"Endpoint Error: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail="Internal server error during proxy.")
+=======
+>>>>>>> 79c5f88650c1859b71654981f454f8077097e16a

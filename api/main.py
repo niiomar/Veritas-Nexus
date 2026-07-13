@@ -14,6 +14,10 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Veritas Nexus API starting up...")
+<<<<<<< HEAD
+=======
+
+>>>>>>> 79c5f88650c1859b71654981f454f8077097e16a
     
     # 1. Fire up the ViT-CORE-FORENSICS background worker
     worker_task = asyncio.create_task(poll_analysis_jobs())
@@ -53,6 +57,7 @@ app.include_router(reports.router, prefix="/api/v1/reports", tags=["Reports"])
 # UPDATED: Real-time telemetry endpoint for the React frontend
 @app.get("/api/v1/health", tags=["System"])
 async def health_check():
+<<<<<<< HEAD
     """
     Provides real-time telemetry to the Veritas Nexus frontend.
     In a production environment, this would actively ping the engine containers.
@@ -63,3 +68,6 @@ async def health_check():
         "vit_status": "ONLINE",
         "c2pa_status": "ONLINE"
     }
+=======
+    return {"status": "operational", "platform": "Veritas Nexus"}
+>>>>>>> 79c5f88650c1859b71654981f454f8077097e16a
