@@ -1,62 +1,100 @@
 import React from 'react';
-import type { Case } from '../types';
+import type { Case, Evidence } from '../types';
+import { AssessmentEngine } from '../services/assessment';
 
-export const Sidebar: React.FC<{ cases: Case[], activeCase: Case, onSelectCase: (c: Case) => void }> = ({ cases, activeCase, onSelectCase }) => (
-  <aside className="sidebar-cases" style={{ width: '280px', flexShrink: 0, borderRight: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', background: 'var(--bg-base)' }}>
-    
-    {/* HEADER */}
-    <div style={{ padding: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-      <div className="mono" style={{ fontSize: '0.75rem', color: 'var(--text-faint)', letterSpacing: '0.1em' }}>
-        ACTIVE INVESTIGATIONS
+interface SidebarProps {
+  cases: Case[];
+  activeCase: Case | null;
+  evidenceLibrary: Evidence[];
+  onSelectCase: (c: Case) => void;
+  onCreateClick: () => void;
+}
+
+export const Sidebar: React.FC<SidebarProps> = ({ cases, activeCase, evidenceLibrary, onSelectCase, onCreateClick }) => {
+  return (
+    <aside style={{
+      width: '320px',
+      backgroundColor: '#0a0a0c',
+      display: 'flex',
+      flexDirection: 'column',
+      flexShrink: 0
+    }}>
+      <div style={{ padding: '24px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="mono" style={{ fontSize: '11px', letterSpacing: '0.15em', fontWeight: 500, color: 'var(--text-faint)' }}>
+          ACTIVE INVESTIGATIONS
+        </div>
+        <button 
+          onClick={onCreateClick} 
+          className="mono hover-bright" 
+          style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: 'var(--text-main)', borderRadius: '4px', padding: '4px 8px', fontSize: '10px', cursor: 'pointer' }}
+        >
+          + NEW
+        </button>
       </div>
-    </div>
-    
-    {/* LIST */}
-    <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 0' }}>
-      {cases.map((c) => {
-        const isActive = activeCase.id === c.id;
-        
-        return (
-          <div 
-            key={c.id} 
-            role="button" 
-            tabIndex={0} 
-            onClick={() => onSelectCase(c)} 
-            onKeyDown={(e) => { if (e.key === 'Enter') onSelectCase(c); }}
-            style={{ 
-              padding: '0.75rem 1.5rem', 
-              display: 'flex', 
-              flexDirection: 'column',
-              gap: '0.25rem',
-              cursor: 'pointer',
-              background: isActive ? 'rgba(255, 255, 255, 0.03)' : 'transparent',
-              borderLeft: `3px solid ${isActive ? 'var(--text-main)' : 'transparent'}`,
-              transition: 'background 0.2s',
-            }}
-            // If you have a hover class in index.css like .hover-bright, you can add it here
-            className="hover-bright"
-          >
-            <div className="mono" style={{ 
-              fontSize: '0.85rem', 
-              fontWeight: isActive ? 600 : 500, 
-              color: isActive ? 'var(--text-main)' : 'var(--text-muted)' 
-            }}>
-              {c.alias}
-            </div>
-            
-            <div style={{ 
-              fontSize: '0.8rem', 
-              color: isActive ? 'var(--text-muted)' : 'var(--text-faint)', 
-              whiteSpace: 'nowrap', 
-              overflow: 'hidden', 
-              textOverflow: 'ellipsis' 
-            }}>
-              {c.name}
-            </div>
+      
+      <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
+        {cases.length === 0 ? (
+          <div className="mono" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-faint)', fontSize: '11px', letterSpacing: '0.1em' }}>
+            NO ACTIVE CASES
           </div>
-        );
-      })}
-    </div>
-    
-  </aside>
-);
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {cases.map((c) => {
+              const isActive = activeCase !== null && c.id === activeCase.id;
+              
+              // DYNAMIC CALCULATION: Replaces the fake math with exact library data
+              const caseEvidence = evidenceLibrary.filter(e => e.case_id === c.id);
+              const stats = caseEvidence.reduce((acc, item) => {
+                const verdict = AssessmentEngine.evaluate(item);
+                if (verdict.type === 'safe') acc.safe++;
+                if (verdict.type === 'warn') acc.warn++;
+                if (verdict.type === 'crit') acc.crit++;
+                return acc;
+              }, { safe: 0, warn: 0, crit: 0 });
+
+              return (
+                <div 
+                  key={c.id}
+                  onClick={() => onSelectCase(c)}
+                  className="hover-bright"
+                  style={{
+                    padding: '16px',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    backgroundColor: isActive ? 'rgba(255,255,255,0.04)' : 'transparent',
+                    border: '1px solid',
+                    borderColor: isActive ? 'rgba(255,255,255,0.1)' : 'transparent',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ fontWeight: 600, fontSize: '13px', color: isActive ? 'var(--text-main)' : 'var(--text-muted)' }}>
+                      {c.alias}
+                    </div>
+                    
+                    <div className="mono" style={{ fontSize: '10px', color: 'var(--text-faint)', letterSpacing: '0.05em' }}>
+                      {caseEvidence.length} ASSETS
+                    </div>
+                    
+                    <div style={{ display: 'flex', gap: '12px', fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ color: 'var(--c-safe)', fontSize: '10px' }}>●</span> {stats.safe}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ color: 'var(--c-warn)', fontSize: '10px' }}>●</span> {stats.warn}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ color: 'var(--c-crit)', fontSize: '10px' }}>●</span> {stats.crit}
+                      </div>
+                    </div>
+                    
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </aside>
+  );
+};
