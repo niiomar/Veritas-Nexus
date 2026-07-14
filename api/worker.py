@@ -130,9 +130,11 @@ async def execute_correlation_engine(job_id: str, evidence_id: str, session):
         real_probability = await asyncio.to_thread(call_vit_core_microservice, file_path)
     except Exception:
         real_probability = None 
-        
+
+    
     # 2. DECOUPLED CRYPTOGRAPHIC PROVENANCE
     c2pa_data = await asyncio.to_thread(verify_c2pa_provenance, file_path)
+
     
     # 3. DYNAMIC POLICY MATRIX
     if real_probability is None:
