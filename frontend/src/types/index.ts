@@ -1,5 +1,3 @@
-// src/types/index.ts
-
 export type ThreatPriority = "Critical" | "High" | "Routine";
 
 export interface Case {
@@ -29,7 +27,7 @@ export interface C2PAData {
   algorithm: string | null;
   timestamp: string | null; // Changed to string to handle actual UTC dates
   error?: string | null;
-  manifest_history?: C2PAAction[]; // Newly added for the Provenance Graph
+  manifest_history?: C2PAAction[]; //added for the Provenance Graph
 }
 
 export interface AIReport {
