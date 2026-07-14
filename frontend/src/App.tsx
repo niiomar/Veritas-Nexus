@@ -76,6 +76,7 @@ export default function App() {
     try {
       // 1. Tell the database to create the case
       const dbResponse = await EvidenceAPI.createCase(newCase);
+
       
       // 2. OVERRIDE React's fake data with the official database data
       const officialCase: Case = {
@@ -83,6 +84,7 @@ export default function App() {
         id: dbResponse.id || dbResponse.case_id, // Captures official Postgres UUID
         name: dbResponse.title || newCase.name,
       };
+
       
       // 3. Save the official case to the UI
       setCases(prev => [officialCase, ...prev]);
@@ -115,6 +117,7 @@ export default function App() {
       <div className="app-container" style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', backgroundColor: '#050505' }}>
         <GlobalCommandBar />
 
+        
         {/* MASTER-DETAIL LAYOUT */}
         <div className="main-layout" style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
           
@@ -126,6 +129,7 @@ export default function App() {
             onCreateClick={() => setIsCreateModalOpen(true)}
           />
 
+          
           {/* LEFT: EVIDENCE LEDGER (Shrinks when dossier is open) */}
           <main style={{ 
             flex: selectedEvidence ? '0 0 450px' : '1', 
