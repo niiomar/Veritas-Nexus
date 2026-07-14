@@ -18,11 +18,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.dependencies import get_db_session as get_db
 from infrastructure.persistence.models import EvidenceORM, AnalysisJobORM, AuditEventORM
 
+# Setup logging
 logger = logging.getLogger("EvidenceRouter")
 
 router = APIRouter(prefix="/api/v1/evidence", tags=["Evidence"])
 STORAGE_VAULT = Path("/vault") 
 
+# Read microservice credentials
 VIT_CORE_URL = os.getenv("VIT_CORE_URL", "http://host.docker.internal:8001/api/v1/analyze")
 VIT_CORE_API_KEY = os.getenv("VIT_CORE_API_KEY", "vitcore_forensics_secure_token_2026")
 
@@ -83,6 +85,7 @@ async def ingest_evidence(
             performed_by=uploaded_by
         )
         db.add(audit_event)
+
         await db.commit()
 
         return {
@@ -91,6 +94,7 @@ async def ingest_evidence(
             "sha256": file_hash,
             "message": "Evidence secured and queued for forensic analysis."
         }
+
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"Ingestion failed: {str(e)}")
@@ -113,6 +117,7 @@ async def list_evidence(db: AsyncSession = Depends(get_db)):
             report = row.get("ai_report")
             if isinstance(report, str):
                 report = json.loads(report)
+
             evidence_list.append({
                 "id": str(row["id"]),
                 "case_id": str(row["case_id"]),
@@ -122,13 +127,16 @@ async def list_evidence(db: AsyncSession = Depends(get_db)):
                 "uploaded_at": row["uploaded_at"].isoformat(),
                 "ai_report": report
             })
+
         return {"evidence": evidence_list}
+        
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch library: {str(e)}")
 
 
 @router.get("/{evidence_id}/download")
 async def get_evidence_file(evidence_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    """Serves the raw physical file for the SOURCE tab."""
     try:
         stmt = text("SELECT storage_uri FROM core.evidence WHERE id = :id")
         result = await db.execute(stmt, {"id": str(evidence_id)})
@@ -136,6 +144,7 @@ async def get_evidence_file(evidence_id: uuid.UUID, db: AsyncSession = Depends(g
 
         if not record or not Path(record.storage_uri).exists():
             raise HTTPException(status_code=404, detail="Physical file missing from storage vault")
+
         return FileResponse(path=Path(record.storage_uri))
     except HTTPException:
         raise
@@ -144,6 +153,7 @@ async def get_evidence_file(evidence_id: uuid.UUID, db: AsyncSession = Depends(g
 
 
 def fetch_heatmap_from_microservice(file_path: str) -> bytes:
+    """Aggressively extracts the single blended base64 string from the original ViT-CORE script."""
     headers = { "X-API-KEY": VIT_CORE_API_KEY, "accept": "application/json" }
     
     try:
@@ -158,28 +168,36 @@ def fetch_heatmap_from_microservice(file_path: str) -> bytes:
             )
         
         if response.status_code != 200:
-            raise RuntimeError(f"ViT-CORE rejected request: HTTP {response.status_code}")
+            raise RuntimeError(f"ViT-CORE rejected request: HTTP {response.status_code} - {response.text}")
         
         data = response.json()
         
-        # The single string output from your original ViT-CORE script
-        # We ensure it handles strings directly
-        b64_string = data if isinstance(data, str) else data.get("heatmap_b64") or data.get("heatmap")
+        # Safely grab the single string, checking all possible keys your schema might use
+        raw_b64 = data.get("explainability_maps") or data.get("heatmap_b64") or data.get("heatmap")
         
-        if not b64_string or not isinstance(b64_string, str):
-            raise RuntimeError("ViT-CORE returned invalid data.")
+        # Safety net: If the schema wrapped it in a dict/list anyway, unpack it
+        if isinstance(raw_b64, dict):
+            raw_b64 = raw_b64.get("heatmap") or raw_b64.get("overlay") or list(raw_b64.values())[0]
+        elif isinstance(raw_b64, list) and len(raw_b64) > 0:
+            raw_b64 = raw_b64[0]
             
-        b64_string = b64_string.replace("data:image/jpeg;base64,", "").replace("data:image/png;base64,", "")
-        return base64.b64decode(b64_string)
+        if not raw_b64 or not isinstance(raw_b64, str):
+            raise RuntimeError(f"ViT-CORE returned missing or invalid heatmap data. Keys: {list(data.keys())}")
+            
+        # Strip potential data URI padding
+        raw_b64 = raw_b64.replace("data:image/jpeg;base64,", "").replace("data:image/png;base64,", "")
+        return base64.b64decode(raw_b64)
         
     except requests.exceptions.RequestException as e:
-        raise RuntimeError(f"Network error: {str(e)}")
+        raise RuntimeError(f"Network error communicating with ViT-CORE: {str(e)}")
     except Exception as e:
         raise RuntimeError(f"Proxy decoding failed: {repr(e)}")
 
 
 @router.get("/{evidence_id}/heatmap", tags=["Evidence", "ViT-CORE"])
-async def get_evidence_heatmap_proxy(evidence_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+@router.get("/{evidence_id}/overlay", tags=["Evidence", "ViT-CORE"])
+async def get_evidence_explainability_proxy(evidence_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    """Serves the exact same blended image to both the Heatmap and Overlay tabs."""
     try:
         stmt = text("SELECT storage_uri FROM core.evidence WHERE id = :id")
         result = await db.execute(stmt, {"id": str(evidence_id)})
@@ -188,11 +206,13 @@ async def get_evidence_heatmap_proxy(evidence_id: uuid.UUID, db: AsyncSession = 
         if not record or not Path(record.storage_uri).exists():
             raise HTTPException(status_code=404, detail="Source image not found")
 
+        # Offload the heavy network request to a separate thread to keep FastAPI fast
         image_bytes = await asyncio.to_thread(fetch_heatmap_from_microservice, str(record.storage_uri))
         return Response(content=image_bytes, media_type="image/jpeg")
+
     except RuntimeError as re:
         logger.error(f"Microservice Error: {str(re)}")
         raise HTTPException(status_code=502, detail=str(re))
     except Exception as e:
         logger.error(f"Endpoint Error: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail="Internal server error.")
+        raise HTTPException(status_code=500, detail="Internal server error during proxy.")
