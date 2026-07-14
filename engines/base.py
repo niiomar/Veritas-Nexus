@@ -17,6 +17,7 @@ class IAnalysisEngine(ABC):
         """Returns the unique Enum identifier for this engine."""
         pass
 
+    
     @property
     @abstractmethod
     def manifest(self) -> EngineManifest:
