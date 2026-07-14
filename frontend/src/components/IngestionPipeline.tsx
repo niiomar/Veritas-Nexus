@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Fingerprint, CheckCircle, Hash, Link2, Network, UploadCloud } from 'lucide-react';
-import type { Case } from '../types'; // Example for Sidebar/IngestionPipeline
+import type { Case } from '../types';
 import { EvidenceAPI } from '../services/api';
 
 export const IngestionPipeline: React.FC<{ file: File, activeCase: Case, onComplete: () => void, onError: (msg: string) => void }> = ({ file, activeCase, onComplete, onError }) => {
@@ -27,7 +27,8 @@ export const IngestionPipeline: React.FC<{ file: File, activeCase: Case, onCompl
         await sleep(500);
         if (!isMounted) return;
         
-        await EvidenceAPI.uploadPayload(activeCase.id, activeCase.analyst, file, controller.signal);
+        // THE FIX: Reordered to (File, Case ID, Analyst). Removed the unused abort signal.
+        await EvidenceAPI.uploadPayload(file, activeCase.id, activeCase.analyst);
         
         advance(5);
         await sleep(800);
