@@ -221,13 +221,31 @@ export default function App() {
                       <span style={{ color: 'var(--text-faint)' }}>ANALYST:</span>
                       <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>{activeCase.analyst.toUpperCase()}</span>
                     </div>
-                    {/* END UPDATED HEADER SECTION */}
 
                     <div style={{ fontSize: selectedEvidence ? '32px' : '48px', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.03em', lineHeight: 1, marginBottom: '12px', wordBreak: 'break-word' }}>
                       {activeCase.alias}
                     </div>
+
                     {!selectedEvidence && (
-                      <div style={{ fontSize: '20px', color: 'var(--text-muted)' }}>{activeCase.name}</div>
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                        <div style={{ fontSize: '20px', color: 'var(--text-main)', fontWeight: 600 }}>
+                          {activeCase.name}
+                        </div>
+                        <span style={{ color: 'var(--text-faint)' }}>•</span>
+                        <span
+                          className="mono"
+                          style={{
+                            fontSize: '10px',
+                            color: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            letterSpacing: '0.1em',
+                          }}
+                        >
+                          STATUS: ACTIVE
+                        </span>
+                      </div>
                     )}
                   </div>
 
