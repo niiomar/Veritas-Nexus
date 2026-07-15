@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
+
 @dataclass(slots=True, frozen=True)
 class DomainEvent:
     evidence_id: UUID
@@ -16,6 +17,7 @@ class DomainEvent:
             "event_id": uuid4(),
             "occurred_at": datetime.now(timezone.utc)
         }
+
 
 @dataclass(slots=True, frozen=True)
 class EvidenceUploadedEvent(DomainEvent):
