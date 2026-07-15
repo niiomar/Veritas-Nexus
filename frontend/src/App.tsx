@@ -9,6 +9,8 @@ import { AssessmentEngine } from './services/assessment';
 import { GlobalCommandBar } from './components/GlobalCommandBar';
 import { Sidebar } from './components/Sidebar';
 import { CreateCaseModal } from './components/CreateCaseModal';
+import { EditCaseModal } from './components/EditCaseModal';
+import { DeleteCaseModal } from './components/DeleteCaseModal';
 import { IngestionPipeline } from './components/IngestionPipeline';
 import { DecisionWorkspace } from './components/DecisionWorkspace';
 
@@ -17,27 +19,39 @@ export default function App() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   
+  const [useVit, setUseVit] = useState(true);
+  const [useC2pa, setUseC2pa] = useState(true);
+  
   const [evidenceLibrary, setEvidenceLibrary] = useState<Evidence[]>([]);
   const [selectedEvidence, setSelectedEvidence] = useState<Evidence | null>(null);
   
   const [cases, setCases] = useState<Case[]>([]);
   const [activeCase, setActiveCase] = useState<Case | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [caseToEdit, setCaseToEdit] = useState<Case | null>(null);
+  const [caseToDelete, setCaseToDelete] = useState<Case | null>(null);
   
   const [engineStatus, setEngineStatus] = useState<EngineStatus>({ vit: 'ONLINE', c2pa: 'ONLINE' });
   const [lastSync, setLastSync] = useState<string>('00:00');
 
-  const fetchLibrary = useCallback(async () => {
+  const syncDatabase = useCallback(async () => {
     try {
-      const evidence = await EvidenceAPI.fetchLibrary();
-      setEvidenceLibrary(evidence);
-      setSelectedEvidence((prev) => prev ? evidence.find((e) => e.id === prev.id) || prev : null);
-      
-      const now = new Date();
-      setLastSync(now.toTimeString().split(' ')[0].substring(0, 5));
+      const evidenceData = await EvidenceAPI.fetchLibrary();
+      setEvidenceLibrary(evidenceData);
+      setSelectedEvidence((prev) => prev ? evidenceData.find((e) => e.id === prev.id) || prev : null);
     } catch (err) {
-      console.error("Failed to sync database:", err);
+      console.error("Evidence sync failed:", err);
     }
+
+    const cached = localStorage.getItem('veritas_cases');
+    if (cached) {
+      const parsedCases = JSON.parse(cached);
+      setCases(parsedCases);
+      setActiveCase((prev) => prev ? parsedCases.find((c: Case) => c.id === prev.id) || prev : null);
+    }
+
+    const now = new Date();
+    setLastSync(now.toTimeString().split(' ')[0].substring(0, 5));
   }, []);
 
   const fetchTelemetry = useCallback(async () => {
@@ -50,20 +64,20 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    fetchLibrary();
+    syncDatabase();
     fetchTelemetry();
     
-    const dbInterval = setInterval(fetchLibrary, 3000);
+    const dbInterval = setInterval(syncDatabase, 3000);
     const telemetryInterval = setInterval(fetchTelemetry, 10000);
     
     return () => { clearInterval(dbInterval); clearInterval(telemetryInterval); };
-  }, [fetchLibrary, fetchTelemetry]);
+  }, [syncDatabase, fetchTelemetry]);
 
   const handleUploadComplete = useCallback(() => {
     setIsUploading(false);
     setFile(null);
-    fetchLibrary();
-  }, [fetchLibrary]);
+    syncDatabase();
+  }, [syncDatabase]);
 
   const handleUploadError = useCallback((msg: string) => {
     setIsUploading(false);
@@ -74,51 +88,92 @@ export default function App() {
 
   const handleCreateCase = async (newCase: Case) => {
     try {
-      // 1. Tell the database to create the case
       const dbResponse = await EvidenceAPI.createCase(newCase);
-
-      
-      // 2. OVERRIDE React's fake data with the official database data
       const officialCase: Case = {
         ...newCase,
-        id: dbResponse.id || dbResponse.case_id, // Captures official Postgres UUID
+        id: dbResponse.id || dbResponse.case_id,
         name: dbResponse.title || newCase.name,
       };
-
       
-      // 3. Save the official case to the UI
-      setCases(prev => [officialCase, ...prev]);
+      setCases(prev => {
+        const updated = [officialCase, ...prev];
+        localStorage.setItem('veritas_cases', JSON.stringify(updated));
+        return updated;
+      });
       setActiveCase(officialCase);
       setIsCreateModalOpen(false);
     } catch (err: any) {
-      console.error("Database sync failed:", err);
       setUploadError(`Case Creation Failed: ${err.message}`);
       setTimeout(() => setUploadError(null), 5000);
     }
   };
 
+  const handleUpdateCase = async (updatedCase: Case) => {
+    try {
+      const dbResponse = await EvidenceAPI.updateCase(updatedCase.id, updatedCase);
+      const officialCase: Case = {
+        ...updatedCase,
+        name: dbResponse.title || updatedCase.name,
+      };
+      
+      setCases(prev => {
+        const updated = prev.map(c => c.id === officialCase.id ? officialCase : c);
+        localStorage.setItem('veritas_cases', JSON.stringify(updated));
+        return updated;
+      });
+      if (activeCase?.id === officialCase.id) setActiveCase(officialCase);
+      setCaseToEdit(null);
+    } catch (err: any) {
+      setUploadError(`Case Update Failed: ${err.message}`);
+      setTimeout(() => setUploadError(null), 5000);
+    }
+  };
+
+  const confirmDeleteCase = async () => {
+    if (!caseToDelete) return;
+    try {
+      setCases(prev => {
+        const updated = prev.filter(c => c.id !== caseToDelete.id);
+        localStorage.setItem('veritas_cases', JSON.stringify(updated));
+        return updated;
+      });
+      if (activeCase?.id === caseToDelete.id) {
+        setActiveCase(null);
+        setSelectedEvidence(null);
+      }
+      setCaseToDelete(null); 
+    } catch (err: any) {
+      setUploadError(`Case Deletion Failed: ${err.message}`);
+      setTimeout(() => setUploadError(null), 5000);
+    }
+  };
+
   const filteredEvidence = activeCase ? evidenceLibrary.filter(item => item.case_id === activeCase.id) : [];
+  const activeQueueCount = filteredEvidence.filter(item => item.status !== 'COMPLETED' || !item.ai_report).length;
 
   return (
     <>
       {uploadError && <div className="toast"><AlertCircle size={16} /> {uploadError}</div>}
 
       {isCreateModalOpen && (
-        <CreateCaseModal 
-          onClose={() => setIsCreateModalOpen(false)} 
-          onSubmit={handleCreateCase} 
-        />
+        <CreateCaseModal onClose={() => setIsCreateModalOpen(false)} onSubmit={handleCreateCase} />
+      )}
+
+      {caseToEdit && (
+        <EditCaseModal initialCase={caseToEdit} onClose={() => setCaseToEdit(null)} onSubmit={handleUpdateCase} />
+      )}
+
+      {caseToDelete && (
+        <DeleteCaseModal caseToDelete={caseToDelete} onClose={() => setCaseToDelete(null)} onConfirm={confirmDeleteCase} />
       )}
 
       {isUploading && file && activeCase && (
-        <IngestionPipeline file={file} activeCase={activeCase} onComplete={handleUploadComplete} onError={handleUploadError} />
+        <IngestionPipeline file={file} activeCase={activeCase} useVit={useVit} useC2pa={useC2pa} onComplete={handleUploadComplete} onError={handleUploadError} />
       )}
 
       <div className="app-container" style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', backgroundColor: '#050505' }}>
         <GlobalCommandBar />
 
-        
-        {/* MASTER-DETAIL LAYOUT */}
         <div className="main-layout" style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
           
           <Sidebar 
@@ -127,16 +182,16 @@ export default function App() {
             evidenceLibrary={evidenceLibrary}
             onSelectCase={(c) => { setActiveCase(c); setSelectedEvidence(null); }} 
             onCreateClick={() => setIsCreateModalOpen(true)}
+            onEditClick={(c) => setCaseToEdit(c)}
+            onDeleteClick={(c) => setCaseToDelete(c)} 
           />
 
-          
-          {/* LEFT: EVIDENCE LEDGER (Shrinks when dossier is open) */}
           <main style={{ 
-            flex: selectedEvidence ? '0 0 450px' : '1', 
+            flex: selectedEvidence ? '0 0 280px' : '1', 
             display: 'flex', flexDirection: 'column', 
-            padding: selectedEvidence ? '32px' : '64px 96px', 
+            padding: selectedEvidence ? '24px' : '64px 96px', 
             borderRight: selectedEvidence ? '1px solid rgba(255,255,255,0.05)' : 'none',
-            overflow: 'hidden', maxWidth: selectedEvidence ? '450px' : '1200px',
+            overflow: 'hidden', maxWidth: selectedEvidence ? '280px' : '1200px',
             transition: 'all 0.2s ease', margin: 0
           }}>
             
@@ -154,7 +209,6 @@ export default function App() {
               </div>
             ) : (
               <>
-                {/* HERO SECTION */}
                 <div style={{ display: 'flex', flexDirection: selectedEvidence ? 'column' : 'row', justifyContent: 'space-between', alignItems: selectedEvidence ? 'flex-start' : 'center', gap: '24px', marginBottom: '48px', flexShrink: 0 }}>
                   <div>
                     <div className="mono" style={{ display: 'flex', gap: '16px', marginBottom: '16px', color: 'var(--text-faint)', fontSize: '11px', letterSpacing: '0.15em' }}>
@@ -162,32 +216,59 @@ export default function App() {
                       <span>•</span>
                       <span>{activeCase.analyst.toUpperCase()}</span>
                     </div>
-                    <div style={{ fontSize: selectedEvidence ? '32px' : '48px', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.03em', lineHeight: 1, marginBottom: '12px' }}>
+                    <div style={{ fontSize: selectedEvidence ? '32px' : '48px', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.03em', lineHeight: 1, marginBottom: '12px', wordBreak: 'break-word' }}>
                       {activeCase.alias}
                     </div>
                     {!selectedEvidence && (
                       <div style={{ fontSize: '20px', color: 'var(--text-muted)' }}>{activeCase.name}</div>
                     )}
                   </div>
-                  <div>
-                    <input type="file" id="file-upload" style={{ display: 'none' }} onChange={(e) => { if(e.target.files?.[0]) { setFile(e.target.files[0]); setIsUploading(true); } }} />
-                    <button 
-                      className="hover-bright mono" 
-                      onClick={() => document.getElementById('file-upload')?.click()} 
-                      style={{ padding: '8px 16px', background: 'transparent', color: 'var(--text-main)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '4px', fontWeight: 500, fontSize: '11px', letterSpacing: '0.1em', cursor: 'pointer' }}
-                    >
-                      ＋ INGEST
-                    </button>
+
+                  <div style={{ display: 'flex', flexDirection: selectedEvidence ? 'column' : 'row', alignItems: selectedEvidence ? 'flex-start' : 'center', gap: '16px', marginTop: selectedEvidence ? '12px' : '0', width: selectedEvidence ? '100%' : 'auto' }}>
+                    <div className="mono" style={{ display: 'flex', gap: '16px', fontSize: '10px', color: 'var(--text-faint)' }}>
+                      <label className="hover-bright" style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: useVit ? 'var(--text-main)' : 'var(--text-muted)' }}>
+                        <input type="checkbox" checked={useVit} onChange={e => setUseVit(e.target.checked)} style={{ accentColor: 'var(--text-main)', cursor: 'pointer' }} />
+                        ViT-CORE
+                      </label>
+                      <label className="hover-bright" style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: useC2pa ? 'var(--text-main)' : 'var(--text-muted)' }}>
+                        <input type="checkbox" checked={useC2pa} onChange={e => setUseC2pa(e.target.checked)} style={{ accentColor: 'var(--text-main)', cursor: 'pointer' }} />
+                        C2PA VERIFY
+                      </label>
+                    </div>
+
+                    <div style={{ width: selectedEvidence ? '100%' : 'auto' }}>
+                      <input type="file" id="file-upload" style={{ display: 'none' }} onChange={(e) => { if(e.target.files?.[0]) { setFile(e.target.files[0]); setIsUploading(true); } }} />
+                      <button 
+                        className="hover-bright mono" 
+                        disabled={!useVit && !useC2pa}
+                        onClick={() => document.getElementById('file-upload')?.click()} 
+                        style={{ 
+                          width: selectedEvidence ? '100%' : 'auto',
+                          padding: '8px 16px', 
+                          background: 'transparent', 
+                          color: (!useVit && !useC2pa) ? 'var(--text-muted)' : 'var(--text-main)', 
+                          border: '1px solid', 
+                          borderColor: (!useVit && !useC2pa) ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.2)', 
+                          borderRadius: '4px', 
+                          fontWeight: 500, 
+                          fontSize: '11px', 
+                          letterSpacing: '0.1em', 
+                          cursor: (!useVit && !useC2pa) ? 'not-allowed' : 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        ＋ INGEST
+                      </button>
+                    </div>
                   </div>
                 </div>
 
-                {/* HIGH-DENSITY LEDGER LIST */}
                 <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, paddingBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.05)', marginBottom: '16px' }}>
                      <div className="mono" style={{ fontSize: '11px', color: 'var(--text-faint)', letterSpacing: '0.15em', fontWeight: 500 }}>EVIDENCE LEDGER</div>
                   </div>
 
-                  <div style={{ flex: 1, overflowY: 'auto', paddingRight: '12px' }}>
+                  <div style={{ flex: 1, overflowY: 'auto', paddingRight: '8px' }}>
                     {filteredEvidence.length === 0 ? (
                       <div style={{ padding: '48px 0', color: 'var(--text-faint)', fontSize: '14px' }}>Awaiting payload ingestion.</div>
                     ) : (
@@ -199,15 +280,15 @@ export default function App() {
                           const isActive = selectedEvidence?.id === item.id;
                           
                           const issuer = item.ai_report?.c2pa_data?.issuer || 'Unknown Publisher';
-                          const dateStr = item.uploaded_at.split('T')[0];
-                          const vitChecked = item.ai_report?.deepfake_probability !== null;
-                          const c2paChecked = item.ai_report?.c2pa_data?.is_signed === true;
+                          const vitRan = item.ai_report?.deepfake_probability !== null;
+                          const c2paRan = item.ai_report?.c2pa_data?.raw_status !== "Bypassed by User";
+                          const c2paVerified = item.ai_report?.c2pa_data?.is_signed === true;
 
                           return (
                             <div key={item.id} role="button" tabIndex={0} onClick={() => setSelectedEvidence(item)}
                                  style={{ 
                                    display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', 
-                                   padding: '16px', borderRadius: '6px', cursor: 'pointer', 
+                                   padding: '12px', borderRadius: '6px', cursor: 'pointer', 
                                    backgroundColor: isActive ? 'rgba(255,255,255,0.04)' : 'transparent',
                                    borderLeft: isActive ? '3px solid var(--text-main)' : '3px solid transparent',
                                    borderTop: '1px solid rgba(255,255,255,0.02)',
@@ -218,28 +299,28 @@ export default function App() {
                                  className="hover-bright">
                               
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0 }}>
-                                <div style={{ fontWeight: 600, fontSize: '14px', color: isActive ? 'var(--text-main)' : 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                <div style={{ fontWeight: 600, fontSize: '13px', color: isActive ? 'var(--text-main)' : 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                   ● {cleanName}
                                 </div>
                                 
                                 {!isEval && (
-                                   <div className="mono" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', fontSize: '10px', color: 'var(--text-faint)' }}>
-                                     <span style={{ color: 'var(--text-muted)' }}>{issuer}</span>
+                                   <div className="mono" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', fontSize: '9px', color: 'var(--text-faint)' }}>
+                                     <span style={{ color: 'var(--text-muted)', maxWidth: '100px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{issuer}</span>
                                      <span>•</span>
-                                     <span>{dateStr}</span>
-                                     <span>•</span>
-                                     <span style={{ color: vitChecked ? 'var(--text-muted)' : 'var(--text-faint)' }}>ViT {vitChecked ? '✓' : '✕'}</span>
-                                     <span style={{ color: c2paChecked ? 'var(--text-muted)' : 'var(--text-faint)' }}>C2PA {c2paChecked ? '✓' : '✕'}</span>
+                                     <span style={{ color: vitRan ? 'var(--text-muted)' : 'var(--text-faint)' }}>ViT {vitRan ? '✓' : '-'}</span>
+                                     <span style={{ color: c2paRan ? (c2paVerified ? 'var(--text-muted)' : 'var(--text-faint)') : 'var(--text-faint)' }}>C2PA {c2paRan ? (c2paVerified ? '✓' : '✕') : '-'}</span>
                                    </div>
                                 )}
                               </div>
 
-                              <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0, paddingLeft: '16px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0, paddingLeft: '8px' }}>
                                 {isEval ? (
-                                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }} className="mono animate-pulse">EVALUATING</span>
+                                  <div className="mono animate-pulse" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: 'var(--text-muted)', fontWeight: 600 }}>
+                                    <span style={{ fontSize: '10px' }}>●</span> EVALUATING
+                                  </div>
                                 ) : (
-                                  <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: 'var(--text-main)', fontWeight: 600 }}>
-                                    <span style={{ color: `var(--c-${ast.type})`, fontSize: '12px' }}>●</span> {ast.conf}%
+                                  <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-main)', fontWeight: 600 }}>
+                                    <span style={{ color: `var(--c-${ast.type})`, fontSize: '10px' }}>●</span> {ast.conf === 'N/A' ? 'N/A' : `${ast.conf}%`}
                                   </div>
                                 )}
                               </div>
@@ -257,7 +338,7 @@ export default function App() {
           {/* RIGHT: DOSSIER */}
           {selectedEvidence && activeCase && (
             <div style={{ flex: 1, overflow: 'hidden', display: 'flex', backgroundColor: '#050505', borderLeft: '1px solid rgba(255,255,255,0.05)' }}>
-               <DecisionWorkspace evidence={selectedEvidence} onClose={() => setSelectedEvidence(null)} />
+               <DecisionWorkspace evidence={selectedEvidence} caseEvidence={filteredEvidence} onClose={() => setSelectedEvidence(null)} />
             </div>
           )}
         </div>
@@ -273,17 +354,11 @@ export default function App() {
               C2PA <span style={{ color: engineStatus.c2pa === 'ONLINE' ? '#10b981' : 'var(--c-crit)', fontWeight: 600 }}>{engineStatus.c2pa}</span>
             </div>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              QUEUE <span style={{ color: 'var(--text-main)' }}>0</span>
+              QUEUE <span style={{ color: 'var(--text-main)' }}>{activeQueueCount}</span>
             </div>
           </div>
 
           <div style={{ display: 'flex', gap: '48px' }}>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              CPU <span style={{ color: 'var(--text-muted)' }}>12%</span>
-            </div>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              GPU <span style={{ color: 'var(--text-main)' }}>41%</span>
-            </div>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               LAST SYNC <span style={{ color: 'var(--text-muted)' }}>{lastSync}</span>
             </div>
