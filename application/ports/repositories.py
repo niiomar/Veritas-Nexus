@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional
 from uuid import UUID
-
 from domain.models import Case, Evidence, AnalysisRun, AuthenticityAssessment, AuditEvent, AnalysisJob
 
 class ICaseRepository(ABC):
