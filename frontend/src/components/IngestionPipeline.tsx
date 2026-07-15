@@ -1,9 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Fingerprint, CheckCircle, Hash, Link2, Network, UploadCloud } from 'lucide-react';
-import type { Case } from '../types'; // Example for Sidebar/IngestionPipeline
+import type { Case } from '../types';
 import { EvidenceAPI } from '../services/api';
 
-export const IngestionPipeline: React.FC<{ file: File, activeCase: Case, onComplete: () => void, onError: (msg: string) => void }> = ({ file, activeCase, onComplete, onError }) => {
+// ADDED: useVit and useC2pa parameters to the component props
+export const IngestionPipeline: React.FC<{ 
+  file: File, 
+  activeCase: Case, 
+  useVit: boolean, 
+  useC2pa: boolean, 
+  onComplete: () => void, 
+  onError: (msg: string) => void 
+}> = ({ file, activeCase, useVit, useC2pa, onComplete, onError }) => {
   const [step, setStep] = useState(0);
   const onCompleteRef = useRef(onComplete);
   const onErrorRef = useRef(onError);
@@ -27,7 +35,8 @@ export const IngestionPipeline: React.FC<{ file: File, activeCase: Case, onCompl
         await sleep(500);
         if (!isMounted) return;
         
-        await EvidenceAPI.uploadPayload(activeCase.id, activeCase.analyst, file, controller.signal);
+        // ADDED: Passing the boolean toggles down to the API function
+        await EvidenceAPI.uploadPayload(file, activeCase.id, activeCase.analyst, useVit, useC2pa);
         
         advance(5);
         await sleep(800);
@@ -42,7 +51,7 @@ export const IngestionPipeline: React.FC<{ file: File, activeCase: Case, onCompl
 
     executePipeline();
     return () => { isMounted = false; controller.abort(); };
-  }, [activeCase.id, activeCase.analyst, file]); 
+  }, [activeCase.id, activeCase.analyst, file, useVit, useC2pa]); // Added dependencies
 
   const steps = [
     { label: "INITIATING INGESTION PAYLOAD", icon: <UploadCloud size={16}/> },
