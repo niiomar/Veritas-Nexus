@@ -15,7 +15,7 @@ logger = logging.getLogger("NSB-Platform-Worker")
 VIT_CORE_URL = os.getenv("VIT_CORE_URL", "http://host.docker.internal:8001/api/v1/analyze")
 VIT_CORE_API_KEY = os.getenv("VIT_CORE_API_KEY", "vitcore_forensics_secure_token_2026")
 C2PA_URL = os.getenv("C2PA_URL", "http://host.docker.internal:8002/api/v1/verify") 
-C2PA_API_KEY = os.getenv("C2PA_API_KEY", "IUHEWRUHIJKLSBXBMNM-XHXBNV9885IKDUF")
+C2PA_API_KEY = os.getenv("C2PA_API_KEY", "vitcore_c2pa_secure_token_2026")
 
 
 def call_vit_core_microservice(file_path: str) -> float:
