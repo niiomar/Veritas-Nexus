@@ -86,6 +86,7 @@ async def health_check(request: Request):
     Provides dynamic telemetry to the Veritas Nexus frontend by tracking the 
     internal asyncio event loop worker status and verifying remote engine ports.
     """
+    
     # 1. Audit the internal background loop task status
     worker_task = getattr(request.app.state, "worker_task", None)
     worker_running = worker_task is not None and not worker_task.done()

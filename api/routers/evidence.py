@@ -34,8 +34,8 @@ async def ingest_evidence(
     case_id: uuid.UUID = Form(...),
     uploaded_by: str = Form(...),
     file: UploadFile = File(...),
-    use_vit: bool = Form(True),    # <-- ADDED: ViT toggle
-    use_c2pa: bool = Form(True),   # <-- ADDED: C2PA toggle
+    use_vit: bool = Form(True),    # ViT toggle
+    use_c2pa: bool = Form(True),   # C2PA toggle
     db: AsyncSession = Depends(get_db)
 ):
     try:
@@ -66,7 +66,7 @@ async def ingest_evidence(
             storage_uri=str(file_path),
             uploaded_by=uploaded_by,
             uploaded_at=now,
-            # <-- ADDED: Saved the toggles to the DB so the worker knows what to execute
+            # Saved the toggles to the DB so the worker knows what to execute
             metadata_dict={
                 "content_type": file.content_type,
                 "use_vit": use_vit,

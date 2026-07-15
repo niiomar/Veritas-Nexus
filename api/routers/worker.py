@@ -57,8 +57,8 @@ def generate_phi3_summary(deepfake_prob: float) -> str:
 async def run_vit_forensics_mock(job_id: str, evidence_id: str, session):
     """Generates the data and connects to Phi-3 for the assessment."""
     logger.info(f"[JOB {job_id}] Initializing ViT-CORE-FORENSICS for Evidence {evidence_id}...")
+
     
-    # 1. Simulate the ViT image analysis (Hardcoded to 88% fake for this test)
     # 1. Simulate the ViT image analysis (Randomized between 1% and 99%)
     await asyncio.sleep(2) 
     simulated_prob = round(random.uniform(0.01, 0.99), 3) 
