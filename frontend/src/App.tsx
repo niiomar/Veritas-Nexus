@@ -211,11 +211,18 @@ export default function App() {
               <>
                 <div style={{ display: 'flex', flexDirection: selectedEvidence ? 'column' : 'row', justifyContent: 'space-between', alignItems: selectedEvidence ? 'flex-start' : 'center', gap: '24px', marginBottom: '48px', flexShrink: 0 }}>
                   <div>
-                    <div className="mono" style={{ display: 'flex', gap: '16px', marginBottom: '16px', color: 'var(--text-faint)', fontSize: '11px', letterSpacing: '0.15em' }}>
-                      <span>{activeCase.priority.toUpperCase()}</span>
-                      <span>•</span>
-                      <span>{activeCase.analyst.toUpperCase()}</span>
+                    {/* UPDATED HEADER SECTION */}
+                    <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px', fontSize: '11px', letterSpacing: '0.15em' }}>
+                      <span style={{ color: 'var(--text-faint)' }}>PRIORITY:</span>
+                      <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>{activeCase.priority.toUpperCase()}</span>
+                      
+                      <span style={{ color: 'var(--text-faint)', margin: '0 8px' }}>•</span>
+                      
+                      <span style={{ color: 'var(--text-faint)' }}>ANALYST:</span>
+                      <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>{activeCase.analyst.toUpperCase()}</span>
                     </div>
+                    {/* END UPDATED HEADER SECTION */}
+
                     <div style={{ fontSize: selectedEvidence ? '32px' : '48px', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.03em', lineHeight: 1, marginBottom: '12px', wordBreak: 'break-word' }}>
                       {activeCase.alias}
                     </div>
