@@ -66,6 +66,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
   const isEval = evidence.status !== 'COMPLETED' || !evidence.ai_report;
   const c2pa = evidence.ai_report?.c2pa_data;
   const vitProb = evidence.ai_report?.deepfake_probability;
+  const platformStatus = evidence.ai_report?.platform_status;
   
   const isVitBypassed = vitProb === null;
   const isC2paBypassed = c2pa?.raw_status === "Bypassed by User";
@@ -77,6 +78,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
   const [activeTab, setActiveTab] = useState<'SOURCE' | 'HEATMAP' | 'OVERLAY' | 'PATCHES' | 'ATTENTION'>('SOURCE');
   const [imageFailed, setImageFailed] = useState(false);
   const [copiedRaw, setCopiedRaw] = useState<'C2PA' | 'VIT' | null>(null);
+  const [copiedInline, setCopiedInline] = useState<'HASH' | 'MANIFEST' | null>(null);
 
   const getImageUrl = (tab: string) => {
     const cacheBuster = `?t=${new Date().getTime()}`;
@@ -90,9 +92,16 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
     setTimeout(() => setCopiedRaw(null), 2000);
   };
 
+  const handleInlineCopy = (type: 'HASH' | 'MANIFEST', text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedInline(type);
+    setTimeout(() => setCopiedInline(null), 2000);
+  };
+
   let recommendationText = 'Asset cleared for operational use.';
-  if (assessment.type === 'crit') recommendationText = 'Quarantine asset immediately.';
+  if (assessment.type === 'crit' || platformStatus === 'CRITICAL THREAT') recommendationText = 'Quarantine asset immediately.';
   else if (assessment.type === 'warn') recommendationText = 'Refer for manual review — conflicting signals detected.';
+  else if (platformStatus === 'UNVERIFIED') recommendationText = 'Unverified asset. ML analysis is clean, but lacks cryptographic provenance. Proceed with caution.';
   else if (assessment.verdict === 'UNKNOWN' || assessment.type === 'unknown') recommendationText = 'Unable to establish trust. Proceed with caution or mandate manual review.';
   else if (isVitBypassed && isC2paBypassed) recommendationText = 'Awaiting manual evaluation (Automated analysis bypassed).';
 
@@ -128,16 +137,14 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
       ) : (
         <div className="animate-slide-in" style={{ maxWidth: '1200px', margin: '0 auto', padding: '48px', display: 'flex', flexDirection: 'column', gap: '80px', width: '100%' }}>
           
-          {/* FIX 1: Enforced minmax(0, 1.5fr) on the right column and tightened the gap so it never blows out */}
           <div id="section-intelligence" style={{ scrollMarginTop: '120px', display: 'grid', gridTemplateColumns: 'minmax(280px, 1fr) minmax(0, 1.5fr)', gap: '40px' }}>
-            
             <div>
               <div className="mono" style={{ color: 'var(--text-faint)', fontSize: '12px', letterSpacing: '0.15em', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={{ color: `var(--c-${assessment.type})` }}>████</span> FINAL ASSESSMENT
+                <span style={{ color: platformStatus === 'UNVERIFIED' ? 'var(--text-muted)' : `var(--c-${assessment.type})` }}>████</span> FINAL ASSESSMENT
               </div>
 
-              <h1 style={{ fontSize: '72px', fontWeight: 800, letterSpacing: '-0.04em', margin: '0 0 8px 0', lineHeight: 1, color: `var(--c-${assessment.type})` }}>
-                {assessment.verdict.toUpperCase()}
+              <h1 style={{ fontSize: '72px', fontWeight: 800, letterSpacing: '-0.04em', margin: '0 0 8px 0', lineHeight: 1, color: platformStatus === 'UNVERIFIED' ? 'var(--text-muted)' : `var(--c-${assessment.type})` }}>
+                {platformStatus === 'UNVERIFIED' ? 'UNVERIFIED' : assessment.verdict.toUpperCase()}
               </h1>
               
               <div style={{ fontSize: '24px', fontWeight: 500, color: 'var(--text-main)', marginBottom: '48px' }}>
@@ -164,7 +171,6 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
               ) : (
                 <div style={{ width: '100%', backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', overflow: 'hidden' }}>
                   
-                  {/* FIX 2: Replaced the rigid Grid with a horizontal, scrollable Flexbox row so text never clips */}
                   <div className="no-scrollbar" style={{ display: 'flex', overflowX: 'auto', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                     {['SOURCE', 'HEATMAP', 'OVERLAY', 'PATCHES', 'ATTENTION'].map((tab) => (
                       <button 
@@ -183,7 +189,6 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                     )}
                   </div>
                   
-                  {/* FIX 3: Tightened the internal gap of the stats so they don't force horizontal wrapping */}
                   <div className="mono" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', padding: '16px', fontSize: '11px', color: 'var(--text-faint)', letterSpacing: '0.05em', background: 'rgba(255,255,255,0.02)', gap: '16px' }}>
                     <div>
                       <div style={{marginBottom: '8px'}}>HEATMAP INTENSITY</div>
@@ -260,16 +265,33 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                    <div style={{ position: 'absolute', top: '-20px', right: '-20px', fontSize: '180px', opacity: 0.02, color: 'white', pointerEvents: 'none', userSelect: 'none' }}>⌘</div>
                    
                    <div style={{ borderBottom: '2px dashed rgba(255,255,255,0.1)', paddingBottom: '24px', marginBottom: '24px', textAlign: 'center' }}>
-                     <div className="mono" style={{ color: '#10b981', fontSize: '10px', letterSpacing: '0.2em', fontWeight: 600, marginBottom: '12px' }}>✓ VERIFIED PUBLISHER</div>
+                     <div className="mono" style={{ color: '#10b981', fontSize: '10px', letterSpacing: '0.2em', fontWeight: 600, marginBottom: '12px' }}>
+                       {['Google LLC', 'Apple Inc.', 'Microsoft'].includes(c2pa.issuer) ? '✓ ROOT CERTIFICATE AUTHORITY' : '✓ VERIFIED CLAIM GENERATOR'}
+                     </div>
                      <div style={{ fontSize: '32px', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>{c2pa.issuer}</div>
                    </div>
                    
-                   <div className="mono" style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: '16px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                   <div className="mono" style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: '16px', fontSize: '11px', color: 'var(--text-muted)', alignItems: 'center' }}>
                      <div>Status</div><div style={{ color: '#10b981', fontWeight: 600 }}>VALID MANIFEST</div>
                      <div>Algorithm</div><div style={{ color: 'var(--text-main)' }}>{c2pa.algorithm}</div>
                      <div>Timestamp</div><div style={{ color: 'var(--text-main)' }}>{c2pa.timestamp}</div>
-                     <div>Asset Hash</div><div style={{ color: 'var(--text-main)', wordBreak: 'break-all' }}>{evidence.sha256.substring(0, 32)}...</div>
-                     <div>Manifest ID</div><div style={{ color: 'var(--text-main)', wordBreak: 'break-all' }}>urn:uuid:{evidence.id.split('-')[0]}...</div>
+                     
+                     <div>Asset Hash</div>
+                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                       <span style={{ color: 'var(--text-main)' }}>{evidence.sha256.substring(0, 32)}...</span>
+                       <button onClick={() => handleInlineCopy('HASH', evidence.sha256)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px' }} className="hover-bright">
+                         {copiedInline === 'HASH' ? <Check size={12} color="#10b981" /> : <Copy size={12} />}
+                       </button>
+                     </div>
+
+                     <div>Manifest ID</div>
+                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                       <span style={{ color: 'var(--text-main)' }}>urn:uuid:{evidence.id.split('-')[0]}...</span>
+                       <button onClick={() => handleInlineCopy('MANIFEST', `urn:uuid:${evidence.id}`)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px' }} className="hover-bright">
+                         {copiedInline === 'MANIFEST' ? <Check size={12} color="#10b981" /> : <Copy size={12} />}
+                       </button>
+                     </div>
+                     
                      {c2pa.issuer === 'OpenAI' && (
                        <>
                          <div style={{ marginTop: '8px' }}>Verification</div>
@@ -289,26 +311,32 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                <div className="mono" style={{ fontSize: '11px', color: 'var(--text-faint)', letterSpacing: '0.15em', marginBottom: '24px', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '12px' }}>EVIDENCE CORRELATION</div>
                
                <div style={{ backgroundColor: '#050505', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '24px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                     
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', paddingBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', paddingBottom: '20px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                        <LinkIcon size={16} color={sameIssuer.length > 0 ? '#3b82f6' : 'var(--text-faint)'} style={{ marginTop: '2px' }} />
-                       <div>
+                       <div style={{ flex: 1 }}>
                          <div className="mono" style={{ fontSize: '10px', color: 'var(--text-faint)', letterSpacing: '0.1em', marginBottom: '4px' }}>SHARED ISSUER</div>
                          {sameIssuer.length > 0 ? (
-                           <div style={{ fontSize: '13px', color: 'var(--text-main)' }}>{c2pa?.issuer} ({sameIssuer.length} other assets)</div>
+                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                             <span style={{ fontSize: '13px', color: 'var(--text-main)' }}>{c2pa?.issuer} ({sameIssuer.length} other assets)</span>
+                             <button style={{ background: 'transparent', border: 'none', color: '#3b82f6', fontSize: '11px', cursor: 'pointer' }} className="hover-bright mono">View assets ↗</button>
+                           </div>
                          ) : (
                            <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>No localized correlations found.</div>
                          )}
                        </div>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', paddingBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', paddingBottom: '20px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                        <LinkIcon size={16} color={sameDay.length > 0 ? '#3b82f6' : 'var(--text-faint)'} style={{ marginTop: '2px' }} />
-                       <div>
+                       <div style={{ flex: 1 }}>
                          <div className="mono" style={{ fontSize: '10px', color: 'var(--text-faint)', letterSpacing: '0.1em', marginBottom: '4px' }}>SHARED CAPTURE DAY</div>
                          {sameDay.length > 0 ? (
-                           <div style={{ fontSize: '13px', color: 'var(--text-main)' }}>{evidence.uploaded_at.split('T')[0]} ({sameDay.length} other assets)</div>
+                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                             <span style={{ fontSize: '13px', color: 'var(--text-main)' }}>{evidence.uploaded_at.split('T')[0]} ({sameDay.length} other assets)</span>
+                             <button style={{ background: 'transparent', border: 'none', color: '#3b82f6', fontSize: '11px', cursor: 'pointer' }} className="hover-bright mono">View assets ↗</button>
+                           </div>
                          ) : (
                            <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>No localized correlations found.</div>
                          )}

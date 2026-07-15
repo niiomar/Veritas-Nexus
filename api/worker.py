@@ -71,6 +71,10 @@ def verify_c2pa_provenance(file_path: str) -> dict:
                     agent_name = agent.get("name") if isinstance(agent, dict) else str(agent) if agent else claim_generator
                     act_name = act.get("action", "Unknown").split(".")[-1].title()
                     
+                    # Prevent raw nulls from bleeding into the JSON report
+                    if not agent_name or agent_name == "None" or agent_name == "null":
+                        agent_name = "Not specified"
+                    
                     history.append({
                         "action": act_name,
                         "agent": agent_name,
@@ -138,7 +142,7 @@ async def execute_correlation_engine(job_id: str, evidence_id: str, session):
             "issuer": None, "algorithm": None, "timestamp": None, "manifest_history": []
         }
     
-    # 3. DYNAMIC POLICY MATRIX (Fixed Logic)
+    # 3. STRICT ZERO-TRUST POLICY MATRIX
     if real_probability is None:
         if c2pa_data["is_signed"] and c2pa_data["status"] == "VALID":
             disposition = "TRUSTED - Verified via Cryptographic Provenance (Neural Engine Bypassed)."
@@ -158,8 +162,8 @@ async def execute_correlation_engine(job_id: str, evidence_id: str, session):
                 disposition = "WARNING - Neural trust achieved, but cryptographic signature is invalid/broken."
                 status_flag = "CONFLICT"
             else:
-                disposition = "HIGH TRUST - No synthetic artifacts detected (Unsigned Asset)."
-                status_flag = "VERIFIED"
+                disposition = "UNVERIFIED - ML analysis clean, but lacks cryptographic provenance."
+                status_flag = "UNVERIFIED"
         elif real_probability < 0.70:
             if c2pa_data["is_signed"] and c2pa_data["status"] == "VALID":
                 disposition = "CRITICAL CONFLICT - Valid cryptography but neural anomalies detected. Possible deepfake injection."
@@ -168,8 +172,12 @@ async def execute_correlation_engine(job_id: str, evidence_id: str, session):
                 disposition = "REVIEW REQUIRED - Minor synthetic anomalies detected."
                 status_flag = "CONFLICT"
         else:
-            disposition = "QUARANTINE - Severe synthetic manipulation detected."
-            status_flag = "CRITICAL THREAT"
+            if c2pa_data["is_signed"] and c2pa_data["status"] == "VALID":
+                disposition = "CRITICAL CONFLICT - Cryptographically signed deepfake detected. Immediate Quarantine."
+                status_flag = "CRITICAL THREAT"
+            else:
+                disposition = "QUARANTINE - Severe synthetic manipulation detected."
+                status_flag = "CRITICAL THREAT"
 
     report_data = {
         "deepfake_probability": real_probability,
