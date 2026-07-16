@@ -15,19 +15,27 @@ export const Sidebar: React.FC<{
 
   const getCaseStats = (caseId: string) => {
     const caseEv = evidenceLibrary.filter(e => e.case_id === caseId);
-    let verified = 0, pending = 0, critical = 0;
+    let verified = 0, pending = 0, critical = 0, review = 0;
 
     caseEv.forEach(ev => {
       if (ev.status !== 'COMPLETED' || !ev.ai_report) {
         pending++;
       } else {
         const ast = AssessmentEngine.evaluate(ev);
-        if (ast.type === 'trust') verified++;
-        else if (ast.type === 'crit') critical++;
+        const platformStatus = ev.ai_report?.platform_status;
+        
+        // Strictly mirror the DecisionWorkspace overrides so the counts are accurate
+        if (ast.type === 'crit' || platformStatus === 'CRITICAL THREAT') {
+          critical++;
+        } else if (platformStatus === 'UNVERIFIED' || ast.type === 'review' || ast.type === 'neutral' || ast.verdict === 'UNKNOWN') {
+          review++;
+        } else if (ast.type === 'trust') {
+          verified++;
+        }
       }
     });
 
-    return { total: caseEv.length, verified, pending, critical };
+    return { total: caseEv.length, verified, pending, critical, review };
   };
 
   return (
@@ -65,16 +73,21 @@ export const Sidebar: React.FC<{
                   {stats.total} ASSET{stats.total !== 1 ? 'S' : ''}
                 </div>
 
-                <div className="mono" style={{ display: 'flex', gap: '12px', fontSize: '10px', color: 'var(--text-muted)' }}>
+                <div className="mono" style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', fontSize: '10px', color: 'var(--text-muted)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <span style={{ color: '#10b981' }}>●</span> {stats.verified} Verified
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <span style={{ color: '#f59e0b' }}>●</span> {stats.pending} Pending
+                    <span style={{ color: '#f59e0b' }}>●</span> {stats.review} Review
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <span style={{ color: '#ef4444' }}>●</span> {stats.critical} Critical
                   </div>
+                  {stats.pending > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ color: 'var(--text-faint)' }}>●</span> {stats.pending} Pending
+                    </div>
+                  )}
                 </div>
 
               </div>
