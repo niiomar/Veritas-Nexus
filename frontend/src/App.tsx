@@ -151,11 +151,13 @@ export default function App() {
   const filteredEvidence = activeCase ? evidenceLibrary.filter(item => item.case_id === activeCase.id) : [];
   const activeQueueCount = filteredEvidence.filter(item => item.status !== 'COMPLETED' || !item.ai_report).length;
 
+  const priorityColor = activeCase?.priority === 'Critical' ? 'var(--c-crit)' : activeCase?.priority === 'High' ? 'var(--c-review)' : 'var(--c-trust)';
+
   return (
     <>
       {uploadError && <div className="toast"><AlertCircle size={16} /> {uploadError}</div>}
 
-      {/* HIGH-PRIORITY MODAL LAYER: Enforces strict top-level stacking so the dossier cannot overlap */}
+      {/* HIGH-PRIORITY MODAL LAYER */}
       <div style={{ position: 'relative', zIndex: 999 }}>
         {isCreateModalOpen && (
           <CreateCaseModal onClose={() => setIsCreateModalOpen(false)} onSubmit={handleCreateCase} />
@@ -214,24 +216,35 @@ export default function App() {
               <>
                 <div style={{ display: 'flex', flexDirection: selectedEvidence ? 'column' : 'row', justifyContent: 'space-between', alignItems: selectedEvidence ? 'flex-start' : 'center', gap: '24px', marginBottom: '24px', flexShrink: 0 }}>
                   
+                  {/* REDESIGNED CASE HEADER */}
                   <div style={{ minWidth: 0, width: '100%' }}>
-                    <div className="mono" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', marginBottom: '12px', fontSize: '11px', letterSpacing: '0.15em' }}>
-                      <span style={{ color: 'var(--text-faint)' }}>PRIORITY:</span>
-                      <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>{activeCase.priority.toUpperCase()}</span>
-                      <span style={{ color: 'var(--text-faint)', margin: '0 8px' }}>•</span>
-                      <span style={{ color: 'var(--text-faint)' }}>ANALYST:</span>
-                      <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>{activeCase.analyst.toUpperCase()}</span>
-                    </div>
-
-                    <div style={{ fontSize: selectedEvidence ? '28px' : '40px', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.03em', lineHeight: 1, marginBottom: '8px', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
-                      {activeCase.alias}
-                    </div>
-
-                    {!selectedEvidence && (
-                      <div style={{ fontSize: '16px', color: 'var(--text-muted)' }}>
-                          {activeCase.name}
+                    <div className="mono" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px', marginBottom: '16px', fontSize: '10px', letterSpacing: '0.15em' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.03)', padding: '6px 12px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <span style={{ color: 'var(--text-faint)' }}>PRIORITY</span>
+                        <span style={{ color: priorityColor, fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', backgroundColor: priorityColor, boxShadow: `0 0 8px ${priorityColor}` }}></span>
+                          {activeCase.priority.toUpperCase()}
+                        </span>
                       </div>
-                    )}
+                      
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.03)', padding: '6px 12px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <span style={{ color: 'var(--text-faint)' }}>ANALYST</span>
+                        <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>{activeCase.analyst.toUpperCase()}</span>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <div style={{ fontSize: selectedEvidence ? '28px' : '48px', fontWeight: 900, color: '#fff', letterSpacing: '-0.04em', lineHeight: 1, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+                        {activeCase.alias}
+                      </div>
+
+                      {!selectedEvidence && (
+                        <div className="mono" style={{ fontSize: '13px', color: 'var(--c-system)', letterSpacing: '0.2em', textTransform: 'uppercase', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <span style={{ width: '24px', height: '1px', backgroundColor: 'var(--c-system)', opacity: 0.5 }}></span>
+                          {activeCase.name}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: selectedEvidence ? 'column' : 'row', alignItems: selectedEvidence ? 'flex-start' : 'center', gap: '16px', marginTop: '0', width: selectedEvidence ? '100%' : 'auto' }}>
