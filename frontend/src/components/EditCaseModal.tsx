@@ -45,7 +45,7 @@ export const EditCaseModal: React.FC<EditCaseModalProps> = ({ initialCase, onClo
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <div>
               <label className="mono" style={{ display: 'block', fontSize: '10px', color: 'var(--text-faint)', marginBottom: '8px' }}>PRIORITY</label>
-              <select value={priority} onChange={e => setPriority(e.target.value)} style={{ width: '100%', backgroundColor: '#050505', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-main)', padding: '10px', borderRadius: '4px' }}>
+              <select value={priority} onChange={e => setPriority(e.target.value as any)} style={{ width: '100%', backgroundColor: '#050505', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-main)', padding: '10px', borderRadius: '4px' }}>
                 <option value="LOW">Low (Routine)</option>
                 <option value="MEDIUM">Medium</option>
                 <option value="HIGH">High</option>

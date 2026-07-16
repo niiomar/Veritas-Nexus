@@ -27,7 +27,7 @@ export interface C2PAData {
   algorithm: string | null;
   timestamp: string | null; // Changed to string to handle actual UTC dates
   error?: string | null;
-  manifest_history?: C2PAAction[]; //added for the Provenance Graph
+  manifest_history?: C2PAAction[]; // added for the Provenance Graph
 }
 
 export interface AIReport {
@@ -48,7 +48,9 @@ export interface Evidence {
   status: EvidenceStatus;
   storage_uri: string;
   uploaded_by: string;
-  upload_date: string;
+  uploaded_at: string; // <-- CORRECTLY PLACED HERE
+  created_at?: string; // <-- CORRECTLY PLACED HERE
+  upload_date?: string; // (Kept optional just in case your backend still sends this)
   ai_report: AIReport | null;
 }
 
@@ -60,6 +62,7 @@ export interface EvidenceAssessment {
   type: AssessmentType;
   msg: string;
   policy: string;
+  // <-- UPLOADED_AT AND CREATED_AT HAVE BEEN REMOVED FROM HERE
 }
 
 export interface EngineStatus {

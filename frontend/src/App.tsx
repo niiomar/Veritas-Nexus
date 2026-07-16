@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { AlertCircle } from 'lucide-react';
 
 import './index.css';
@@ -38,7 +38,7 @@ export default function App() {
     try {
       const evidenceData = await EvidenceAPI.fetchLibrary();
       setEvidenceLibrary(evidenceData);
-      setSelectedEvidence((prev) => prev ? evidenceData.find((e) => e.id === prev.id) || prev : null);
+      setSelectedEvidence((prev) => prev ? evidenceData.find((e: Evidence) => e.id === prev.id) || prev : null);
     } catch (err) {
       console.error("Evidence sync failed:", err);
     }
@@ -210,8 +210,9 @@ export default function App() {
             ) : (
               <>
                 <div style={{ display: 'flex', flexDirection: selectedEvidence ? 'column' : 'row', justifyContent: 'space-between', alignItems: selectedEvidence ? 'flex-start' : 'center', gap: '24px', marginBottom: '48px', flexShrink: 0 }}>
+                  
+                  {/* LEFT SIDE: Title Block */}
                   <div>
-                    {/* UPDATED HEADER SECTION */}
                     <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px', fontSize: '11px', letterSpacing: '0.15em' }}>
                       <span style={{ color: 'var(--text-faint)' }}>PRIORITY:</span>
                       <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>{activeCase.priority.toUpperCase()}</span>
@@ -227,28 +228,13 @@ export default function App() {
                     </div>
 
                     {!selectedEvidence && (
-                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                        <div style={{ fontSize: '20px', color: 'var(--text-main)', fontWeight: 600 }}>
+                      <div style={{ fontSize: '20px', color: 'var(--text-muted)' }}>
                           {activeCase.name}
-                        </div>
-                        <span style={{ color: 'var(--text-faint)' }}>•</span>
-                        <span
-                          className="mono"
-                          style={{
-                            fontSize: '10px',
-                            color: '#10b981',
-                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                            padding: '2px 8px',
-                            borderRadius: '4px',
-                            letterSpacing: '0.1em',
-                          }}
-                        >
-                          STATUS: ACTIVE
-                        </span>
                       </div>
                     )}
-                  </div>
+                  </div> {/* <--- THIS IS THE DIV THAT WAS MISSING! */}
 
+                  {/* RIGHT SIDE: Controls Block */}
                   <div style={{ display: 'flex', flexDirection: selectedEvidence ? 'column' : 'row', alignItems: selectedEvidence ? 'flex-start' : 'center', gap: '16px', marginTop: selectedEvidence ? '12px' : '0', width: selectedEvidence ? '100%' : 'auto' }}>
                     <div className="mono" style={{ display: 'flex', gap: '16px', fontSize: '10px', color: 'var(--text-faint)' }}>
                       <label className="hover-bright" style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: useVit ? 'var(--text-main)' : 'var(--text-muted)' }}>

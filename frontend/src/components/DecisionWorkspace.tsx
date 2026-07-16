@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Share2, Disc, Edit2, Lock, ShieldCheck, Circle, Check, Copy, Link as LinkIcon, AlertTriangle } from 'lucide-react';
 import type { Evidence } from '../types';
 import { AssessmentEngine } from '../services/assessment';
@@ -100,13 +100,13 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
 
   let recommendationText = 'Asset cleared for operational use.';
   if (assessment.type === 'crit' || platformStatus === 'CRITICAL THREAT') recommendationText = 'Quarantine asset immediately.';
-  else if (assessment.type === 'warn') recommendationText = 'Refer for manual review — conflicting signals detected.';
+  else if (assessment.type === 'review') recommendationText = 'Refer for manual review — conflicting signals detected.'
   else if (platformStatus === 'UNVERIFIED') recommendationText = 'Unverified asset. ML analysis is clean, but lacks cryptographic provenance. Proceed with caution.';
-  else if (assessment.verdict === 'UNKNOWN' || assessment.type === 'unknown') recommendationText = 'Unable to establish trust. Proceed with caution or mandate manual review.';
+  else if (assessment.verdict === 'UNKNOWN' || assessment.type === 'neutral') recommendationText = 'Unable to establish trust. Proceed with caution or mandate manual review.';
   else if (isVitBypassed && isC2paBypassed) recommendationText = 'Awaiting manual evaluation (Automated analysis bypassed).';
 
-  const regionsCount = vitProb !== null && vitProb > 0.15 ? Math.max(1, Math.ceil(vitProb * 6)) : 0;
-  const syntheticText = vitProb !== null && vitProb > 0.15 ? `${regionsCount} REGIONS` : '0 REGIONS';
+  const regionsCount = typeof vitProb === 'number' && vitProb > 0.15 ? Math.max(1, Math.ceil(vitProb * 6)) : 0;
+  const syntheticText = typeof vitProb === 'number' && vitProb > 0.15 ? `${regionsCount} REGIONS` : '0 REGIONS';
 
   const sameIssuer = caseEvidence.filter(e => e.id !== evidence.id && e.ai_report?.c2pa_data?.issuer === c2pa?.issuer && c2pa?.issuer && e.ai_report?.c2pa_data?.is_signed);
   const sameDay = caseEvidence.filter(e => e.id !== evidence.id && e.uploaded_at.split('T')[0] === evidence.uploaded_at.split('T')[0]);
@@ -155,9 +155,9 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                 <div className="mono" style={{ fontSize: '10px', color: 'var(--text-faint)', letterSpacing: '0.1em', marginBottom: '16px' }}>ANALYST FINDINGS</div>
                 <div style={{ fontSize: '14px', color: 'var(--text-muted)', lineHeight: 1.6 }}>
                   {isC2paBypassed ? 'Cryptographic verification bypassed.' : (c2pa?.is_signed ? 'Cryptographic signature validated.' : 'Missing C2PA provenance manifest.')} <br/>
-                  {isVitBypassed ? 'Neural Inference bypassed.' : (vitProb !== null && vitProb > 0.15 ? 'Neural artifacts detected inconsistent with authentic sensor noise.' : 'No synthetic anomalies detected by Neural Engine.')} <br/>
+                  {isVitBypassed ? 'Neural Inference bypassed.' : (typeof vitProb === 'number' && vitProb > 0.15 ? 'Neural artifacts detected inconsistent with authentic sensor noise.' : 'No synthetic anomalies detected by Neural Engine.')} <br/>
                 </div>
-                <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px dashed rgba(255,255,255,0.1)', fontSize: '14px', color: assessment.type === 'warn' || assessment.type === 'crit' || assessment.verdict === 'UNKNOWN' ? 'var(--text-main)' : 'var(--text-muted)' }}>
+                <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px dashed rgba(255,255,255,0.1)', fontSize: '14px', color: assessment.type === 'review' || assessment.type === 'crit' || assessment.verdict === 'UNKNOWN' ? 'var(--text-main)' : 'var(--text-muted)' }}>
                    <strong>Recommendation:</strong> {recommendationText}
                 </div>
               </div>
@@ -194,16 +194,16 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                       <div style={{marginBottom: '8px'}}>HEATMAP INTENSITY</div>
                       <div style={{ position: 'relative', height: '4px', width: '100%', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '2px' }}>
                         <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, right: 0, background: 'linear-gradient(90deg, #3b82f6 0%, #10b981 40%, #f59e0b 70%, #ef4444 100%)', borderRadius: '2px', opacity: 0.8 }}></div>
-                        {vitProb !== null && <div style={{ position: 'absolute', left: `${vitProb * 100}%`, top: '-4px', bottom: '-4px', width: '2px', backgroundColor: '#fff', boxShadow: '0 0 4px rgba(255,255,255,0.8)' }}></div>}
+                        {typeof vitProb === 'number' && <div style={{ position: 'absolute', left: `${vitProb * 100}%`, top: '-4px', bottom: '-4px', width: '2px', backgroundColor: '#fff', boxShadow: '0 0 4px rgba(255,255,255,0.8)' }}></div>}
                       </div>
                     </div>
                     <div>
                       <div style={{marginBottom: '4px'}}>INFERENCE CONFIDENCE</div>
-                      <div style={{color: 'var(--text-main)', fontSize: '13px'}}>{vitProb !== null ? ((1 - vitProb) * 100).toFixed(1) : '--'}%</div>
+                      <div style={{color: 'var(--text-main)', fontSize: '13px'}}>{typeof vitProb === 'number' ? ((1 - vitProb) * 100).toFixed(1) : '--'}%</div>
                     </div>
                     <div>
                       <div style={{marginBottom: '4px'}}>SYNTHETIC REGIONS</div>
-                      <div style={{color: vitProb !== null && vitProb > 0.15 ? 'var(--c-warn)' : 'var(--text-main)', fontSize: '13px'}}>{syntheticText}</div>
+                      <div style={{color: typeof vitProb === 'number' && vitProb > 0.15 ? 'var(--c-warn)' : 'var(--text-main)', fontSize: '13px'}}>{syntheticText}</div>
                     </div>
                   </div>
                 </div>
@@ -266,7 +266,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                    
                    <div style={{ borderBottom: '2px dashed rgba(255,255,255,0.1)', paddingBottom: '24px', marginBottom: '24px', textAlign: 'center' }}>
                      <div className="mono" style={{ color: '#10b981', fontSize: '10px', letterSpacing: '0.2em', fontWeight: 600, marginBottom: '12px' }}>
-                       {['Google LLC', 'Apple Inc.', 'Microsoft'].includes(c2pa.issuer) ? '✓ ROOT CERTIFICATE AUTHORITY' : '✓ VERIFIED CLAIM GENERATOR'}
+                       {['Google LLC', 'Apple Inc.', 'Microsoft'].includes(c2pa.issuer || '') ? '✓ ROOT CERTIFICATE AUTHORITY' : '✓ VERIFIED CLAIM GENERATOR'}
                      </div>
                      <div style={{ fontSize: '32px', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>{c2pa.issuer}</div>
                    </div>
