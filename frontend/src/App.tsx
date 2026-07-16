@@ -318,6 +318,7 @@ export default function App() {
                             finalColorType = 'trust';
                           }
 
+                        
                           return (
                             <div key={item.id} role="button" tabIndex={0} onClick={() => setSelectedEvidence(item)}
                                  style={{ 
@@ -367,6 +368,7 @@ export default function App() {
             )}
           </main>
 
+          
           {/* RIGHT: DOSSIER */}
           {selectedEvidence && activeCase && (
             <div style={{ flex: 1, overflow: 'hidden', display: 'flex', backgroundColor: '#050505', borderLeft: '1px solid rgba(255,255,255,0.05)' }}>
@@ -374,6 +376,7 @@ export default function App() {
             </div>
           )}
         </div>
+
         
         {/* OPERATIONS CENTER TELEMETRY FOOTER */}
         <div className="mono" style={{ height: '40px', background: 'var(--bg-base)', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px', flexShrink: 0, zIndex: 10, fontSize: '10px', color: 'var(--text-faint)', letterSpacing: '0.1em' }}>
