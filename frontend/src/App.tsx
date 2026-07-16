@@ -151,7 +151,13 @@ export default function App() {
   const filteredEvidence = activeCase ? evidenceLibrary.filter(item => item.case_id === activeCase.id) : [];
   const activeQueueCount = filteredEvidence.filter(item => item.status !== 'COMPLETED' || !item.ai_report).length;
 
-  const priorityColor = activeCase?.priority === 'Critical' ? 'var(--c-crit)' : activeCase?.priority === 'High' ? 'var(--c-review)' : 'var(--c-trust)';
+  // ROBUST DYNAMIC COLOR LOGIC
+  let priorityColor = 'var(--text-muted)';
+  const pText = activeCase?.priority?.toLowerCase() || '';
+  if (pText.includes('crit')) priorityColor = 'var(--c-crit)';
+  else if (pText.includes('high')) priorityColor = 'var(--c-review)';
+  else if (pText.includes('med')) priorityColor = 'var(--c-system)';
+  else if (pText.includes('low') || pText.includes('routine')) priorityColor = 'var(--c-trust)';
 
   return (
     <>
