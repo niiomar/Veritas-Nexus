@@ -159,8 +159,8 @@ async def get_evidence_file(evidence_id: uuid.UUID, db: AsyncSession = Depends(g
         raise HTTPException(status_code=500, detail=f"Failed to retrieve file: {str(e)}")
 
 
-def fetch_heatmap_from_microservice(file_path: str) -> bytes:
-    """Aggressively extracts the single blended base64 string from the original ViT-CORE script."""
+def fetch_visual_from_microservice(file_path: str, visual_type: str) -> bytes:
+    """Extracts specific visual layers (heatmap, patches, attention) from the ViT-CORE."""
     headers = { "X-API-KEY": VIT_CORE_API_KEY, "accept": "application/json" }
     
     try:
@@ -179,17 +179,21 @@ def fetch_heatmap_from_microservice(file_path: str) -> bytes:
         
         data = response.json()
         
-        # Safely grab the single string, checking all possible keys your schema might use
-        raw_b64 = data.get("explainability_maps") or data.get("heatmap_b64") or data.get("heatmap")
+        # Unpack the new dictionary array returned by the updated model.py
+        maps = data.get("explainability_maps", [])
+        raw_b64 = None
         
-        # Safety net: If the schema wrapped it in a dict/list anyway, unpack it
-        if isinstance(raw_b64, dict):
-            raw_b64 = raw_b64.get("heatmap") or raw_b64.get("overlay") or list(raw_b64.values())[0]
-        elif isinstance(raw_b64, list) and len(raw_b64) > 0:
-            raw_b64 = raw_b64[0]
+        if isinstance(maps, list) and len(maps) > 0:
+            frame_visuals = maps[0]
+            if isinstance(frame_visuals, dict):
+                raw_b64 = frame_visuals.get(visual_type)
+            elif isinstance(frame_visuals, str):
+                raw_b64 = frame_visuals  # Fallback for old single-string format
+        elif isinstance(maps, dict):
+            raw_b64 = maps.get(visual_type)
             
         if not raw_b64 or not isinstance(raw_b64, str):
-            raise RuntimeError(f"ViT-CORE returned missing or invalid heatmap data. Keys: {list(data.keys())}")
+            raise RuntimeError(f"ViT-CORE returned missing or invalid '{visual_type}' data.")
             
         # Strip potential data URI padding
         raw_b64 = raw_b64.replace("data:image/jpeg;base64,", "").replace("data:image/png;base64,", "")
@@ -201,10 +205,12 @@ def fetch_heatmap_from_microservice(file_path: str) -> bytes:
         raise RuntimeError(f"Proxy decoding failed: {repr(e)}")
 
 
-@router.get("/{evidence_id}/heatmap", tags=["Evidence", "ViT-CORE"])
-@router.get("/{evidence_id}/overlay", tags=["Evidence", "ViT-CORE"])
-async def get_evidence_explainability_proxy(evidence_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
-    """Serves the exact same blended image to both the Heatmap and Overlay tabs."""
+# ---------------------------------------------------------
+# DYNAMIC PROXY ROUTER HANDLERS
+# ---------------------------------------------------------
+
+async def _proxy_visual(evidence_id: uuid.UUID, visual_type: str, db: AsyncSession):
+    """Core logic to fetch physical file paths and route them to the ViT microservice."""
     try:
         stmt = text("SELECT storage_uri FROM core.evidence WHERE id = :id")
         result = await db.execute(stmt, {"id": str(evidence_id)})
@@ -214,7 +220,7 @@ async def get_evidence_explainability_proxy(evidence_id: uuid.UUID, db: AsyncSes
             raise HTTPException(status_code=404, detail="Source image not found")
 
         # Offload the heavy network request to a separate thread to keep FastAPI fast
-        image_bytes = await asyncio.to_thread(fetch_heatmap_from_microservice, str(record.storage_uri))
+        image_bytes = await asyncio.to_thread(fetch_visual_from_microservice, str(record.storage_uri), visual_type)
         return Response(content=image_bytes, media_type="image/jpeg")
 
     except RuntimeError as re:
@@ -223,3 +229,21 @@ async def get_evidence_explainability_proxy(evidence_id: uuid.UUID, db: AsyncSes
     except Exception as e:
         logger.error(f"Endpoint Error: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail="Internal server error during proxy.")
+
+
+@router.get("/{evidence_id}/heatmap", tags=["Evidence", "ViT-CORE"])
+async def get_heatmap(evidence_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    """Serves the blended thermal map."""
+    return await _proxy_visual(evidence_id, "heatmap", db)
+
+
+@router.get("/{evidence_id}/patches", tags=["Evidence", "ViT-CORE"])
+async def get_patches(evidence_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    """Serves the 16x16 geometry grid."""
+    return await _proxy_visual(evidence_id, "patches", db)
+
+
+@router.get("/{evidence_id}/attention", tags=["Evidence", "ViT-CORE"])
+async def get_attention(evidence_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    """Serves the raw neural attention map."""
+    return await _proxy_visual(evidence_id, "attention", db)
