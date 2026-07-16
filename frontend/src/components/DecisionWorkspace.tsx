@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import { Share2, Disc, Edit2, Lock, ShieldCheck, Circle, Check, Copy, Link as LinkIcon, AlertTriangle, ChevronDown, ChevronRight, Maximize, ZoomIn, ZoomOut } from 'lucide-react';
+import { Share2, Disc, Edit2, Lock, ShieldCheck, Circle, Check, Copy, Link as LinkIcon, AlertTriangle, ChevronDown, ChevronRight, Maximize, ZoomIn, ZoomOut, Info } from 'lucide-react';
 import type { Evidence } from '../types';
 import { AssessmentEngine } from '../services/assessment';
 
@@ -79,7 +79,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
     : [{ action: 'Origin', agent: 'Unknown Sensor/Software', timestamp: evidence.created_at || 'Unknown', description: 'Initial file creation' }];
 
   const [mainTab, setMainTab] = useState<'MEDIA' | 'PROVENANCE' | 'CREDENTIAL' | 'CORRELATION' | 'RAW'>('MEDIA');
-  const [imageTab, setImageTab] = useState<'SOURCE' | 'HEATMAP' | 'OVERLAY' | 'PATCHES' | 'ATTENTION'>('SOURCE');
+  const [imageTab, setImageTab] = useState<'SOURCE' | 'HEATMAP' | 'PATCHES' | 'ATTENTION'>('SOURCE');
   
   const [imageFailed, setImageFailed] = useState(false);
   const [copiedRaw, setCopiedRaw] = useState<'C2PA' | 'VIT' | null>(null);
@@ -98,6 +98,8 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
   const getImageUrl = (tab: string) => {
     const cacheBuster = `?t=${new Date().getTime()}`;
     if (tab === 'HEATMAP') return `${API_BASE_URL}/api/v1/evidence/${evidence.id}/heatmap${cacheBuster}`;
+    if (tab === 'PATCHES') return `${API_BASE_URL}/api/v1/evidence/${evidence.id}/patches${cacheBuster}`;
+    if (tab === 'ATTENTION') return `${API_BASE_URL}/api/v1/evidence/${evidence.id}/attention${cacheBuster}`;
     return `${API_BASE_URL}/api/v1/evidence/${evidence.id}/download${cacheBuster}`; 
   };
 
@@ -202,10 +204,13 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                         <button onClick={() => setZoom(z => Math.min(z + 0.25, 4))} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px' }} className="hover-bright"><ZoomIn size={12} /> IN</button>
                         <button onClick={() => setZoom(1)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px' }} className="hover-bright"><Maximize size={12} /> FIT</button>
                       </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                        <button onClick={() => setMainTab('RAW')} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px' }} className="hover-bright"><Info size={12} /> METADATA</button>
+                      </div>
                     </div>
 
                     <div className="no-scrollbar" style={{ display: 'flex', overflowX: 'auto', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                      {['SOURCE', 'HEATMAP', 'OVERLAY', 'PATCHES', 'ATTENTION'].map((tab) => (
+                      {['SOURCE', 'HEATMAP', 'PATCHES', 'ATTENTION'].map((tab) => (
                         <button 
                           key={tab} onClick={() => { setImageTab(tab as any); setImageFailed(false); }}
                           className="mono hover-bright"
