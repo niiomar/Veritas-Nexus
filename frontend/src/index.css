@@ -21,7 +21,12 @@
   --c-crit: #ef4444;
 }
 
-* { box-sizing: border-box; }
+* { 
+  box-sizing: border-box; 
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) rgba(255, 255, 255, 0.02);
+}
+
 body { font-family: 'Inter', sans-serif; background-color: var(--bg-base); color: var(--text-main); margin: 0; padding: 0; height: 100vh; overflow: hidden; }
 .mono { font-family: 'JetBrains Mono', monospace; }
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -87,3 +92,23 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-base); color
 
 .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+/* Custom Dark Theme Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
