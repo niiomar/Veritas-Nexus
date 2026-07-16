@@ -153,9 +153,8 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
 
               <div style={{ padding: '24px', backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px' }}>
                 <div className="mono" style={{ fontSize: '10px', color: 'var(--text-faint)', letterSpacing: '0.1em', marginBottom: '16px' }}>ANALYST FINDINGS</div>
-                <div style={{ fontSize: '14px', color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                  {isC2paBypassed ? 'Cryptographic verification bypassed.' : (c2pa?.is_signed ? 'Cryptographic signature validated.' : 'Missing C2PA provenance manifest.')} <br/>
-                  {isVitBypassed ? 'Neural Inference bypassed.' : (typeof vitProb === 'number' && vitProb > 0.15 ? 'Neural artifacts detected inconsistent with authentic sensor noise.' : 'No synthetic anomalies detected by Neural Engine.')} <br/>
+                <div style={{ fontSize: '14px', color: 'var(--text-main)', lineHeight: 1.6, fontWeight: 500 }}>
+                  {evidence.ai_report?.disposition || 'Analysis complete. Refer to raw JSON for detailed execution trace.'}
                 </div>
                 <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px dashed rgba(255,255,255,0.1)', fontSize: '14px', color: assessment.type === 'review' || assessment.type === 'crit' || assessment.verdict === 'UNKNOWN' ? 'var(--text-main)' : 'var(--text-muted)' }}>
                    <strong>Recommendation:</strong> {recommendationText}
@@ -239,7 +238,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                           {label.toUpperCase()}
                         </div>
                         <div style={{ fontSize: '11px', color: 'var(--text-main)', textAlign: 'center', marginBottom: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', minHeight: '16px' }}>
-                          {node.agent || 'Unknown System'}
+                          {node.agent && node.agent !== 'null' ? node.agent : 'Unknown System'}
                         </div>
                         <div className="mono" style={{ fontSize: '10px', textAlign: 'center' }}>
                           {formatTimeNodes(node.timestamp)}
@@ -266,7 +265,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                    
                    <div style={{ borderBottom: '2px dashed rgba(255,255,255,0.1)', paddingBottom: '24px', marginBottom: '24px', textAlign: 'center' }}>
                      <div className="mono" style={{ color: '#10b981', fontSize: '10px', letterSpacing: '0.2em', fontWeight: 600, marginBottom: '12px' }}>
-                       {['Google LLC', 'Apple Inc.', 'Microsoft'].includes(c2pa.issuer || '') ? '✓ ROOT CERTIFICATE AUTHORITY' : '✓ VERIFIED CLAIM GENERATOR'}
+                       ✓ VERIFIED CLAIM GENERATOR
                      </div>
                      <div style={{ fontSize: '32px', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>{c2pa.issuer}</div>
                    </div>

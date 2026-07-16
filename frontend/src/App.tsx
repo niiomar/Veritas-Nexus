@@ -212,8 +212,8 @@ export default function App() {
                 <div style={{ display: 'flex', flexDirection: selectedEvidence ? 'column' : 'row', justifyContent: 'space-between', alignItems: selectedEvidence ? 'flex-start' : 'center', gap: '24px', marginBottom: '48px', flexShrink: 0 }}>
                   
                   {/* LEFT SIDE: Title Block */}
-                  <div>
-                    <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px', fontSize: '11px', letterSpacing: '0.15em' }}>
+                  <div style={{ minWidth: 0, width: '100%' }}>
+                    <div className="mono" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', marginBottom: '16px', fontSize: '11px', letterSpacing: '0.15em' }}>
                       <span style={{ color: 'var(--text-faint)' }}>PRIORITY:</span>
                       <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>{activeCase.priority.toUpperCase()}</span>
                       
@@ -223,7 +223,7 @@ export default function App() {
                       <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>{activeCase.analyst.toUpperCase()}</span>
                     </div>
 
-                    <div style={{ fontSize: selectedEvidence ? '32px' : '48px', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.03em', lineHeight: 1, marginBottom: '12px', wordBreak: 'break-word' }}>
+                    <div style={{ fontSize: selectedEvidence ? '32px' : '48px', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.03em', lineHeight: 1, marginBottom: '12px', wordBreak: 'break-word', overflowWrap: 'break-word' }}>
                       {activeCase.alias}
                     </div>
 
@@ -232,7 +232,7 @@ export default function App() {
                           {activeCase.name}
                       </div>
                     )}
-                  </div> {/* <--- THIS IS THE DIV THAT WAS MISSING! */}
+                  </div>
 
                   {/* RIGHT SIDE: Controls Block */}
                   <div style={{ display: 'flex', flexDirection: selectedEvidence ? 'column' : 'row', alignItems: selectedEvidence ? 'flex-start' : 'center', gap: '16px', marginTop: selectedEvidence ? '12px' : '0', width: selectedEvidence ? '100%' : 'auto' }}>
