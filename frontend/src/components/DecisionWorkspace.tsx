@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import { Share2, Disc, Edit2, Lock, ShieldCheck, Circle, Check, Copy, Link as LinkIcon, AlertTriangle, ChevronDown, ChevronRight, Maximize, ZoomIn, ZoomOut, Info } from 'lucide-react';
+import { Share2, Disc, Edit2, Lock, ShieldCheck, Circle, Check, Copy, Link as LinkIcon, AlertTriangle, ChevronDown, ChevronRight, Maximize, ZoomIn, ZoomOut } from 'lucide-react';
 import type { Evidence } from '../types';
 import { AssessmentEngine } from '../services/assessment';
 
@@ -63,8 +63,17 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
   
   const isVitBypassed = vitProb === null;
   const isC2paBypassed = c2pa?.raw_status === "Bypassed by User";
-  const isC2paBroken = c2pa?.status === "BROKEN_SIGNATURE"; // <--- NEW STRICT TAMPERING CHECK
+  const isC2paBroken = c2pa?.status === "BROKEN_SIGNATURE";
   
+  let finalColorType = assessment.type;
+  if (assessment.type === 'crit' || platformStatus === 'CRITICAL THREAT' || isC2paBroken) {
+    finalColorType = 'crit';
+  } else if (platformStatus === 'UNVERIFIED' || assessment.type === 'review' || assessment.type === 'neutral' || assessment.verdict === 'UNKNOWN') {
+    finalColorType = 'review';
+  } else {
+    finalColorType = 'trust';
+  }
+
   const history = c2pa?.manifest_history?.length 
     ? c2pa.manifest_history 
     : [{ action: 'Origin', agent: 'Unknown Sensor/Software', timestamp: evidence.created_at || 'Unknown', description: 'Initial file creation' }];
@@ -129,9 +138,9 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
           <div style={{ flexShrink: 0, padding: '32px 48px', backgroundColor: 'rgba(255,255,255,0.01)', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexWrap: 'wrap', gap: '32px', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div style={{ flex: 1, minWidth: '300px' }}>
               <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '11px', letterSpacing: '0.1em', color: 'var(--text-faint)', marginBottom: '8px' }}>
-                EVIDENCE ASSESSMENT
+                <span style={{ color: `var(--c-${finalColorType})` }}>████</span> EVIDENCE ASSESSMENT
               </div>
-              <div style={{ fontSize: '32px', fontWeight: 800, color: platformStatus === 'UNVERIFIED' ? 'var(--text-muted)' : `var(--c-${assessment.type})`, letterSpacing: '-0.02em', marginBottom: '16px' }}>
+              <div style={{ fontSize: '32px', fontWeight: 800, color: `var(--c-${finalColorType})`, letterSpacing: '-0.02em', marginBottom: '16px' }}>
                 {platformStatus === 'UNVERIFIED' ? 'UNVERIFIED' : assessment.verdict.toUpperCase()}
               </div>
               <div style={{ fontSize: '14px', color: 'var(--text-main)', lineHeight: 1.5 }}>
@@ -141,7 +150,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', minWidth: '200px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px', backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px' }}>
-                <div style={{ position: 'relative', width: '32px', height: '32px', borderRadius: '50%', border: '3px solid rgba(255,255,255,0.1)', borderTopColor: assessment.conf !== 'N/A' ? `var(--c-${assessment.type})` : 'rgba(255,255,255,0.1)' }}></div>
+                <div style={{ position: 'relative', width: '32px', height: '32px', borderRadius: '50%', border: '3px solid rgba(255,255,255,0.1)', borderTopColor: assessment.conf !== 'N/A' ? `var(--c-${finalColorType})` : 'rgba(255,255,255,0.1)' }}></div>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <span className="mono" style={{ fontSize: '10px', color: 'var(--text-faint)', letterSpacing: '0.1em' }}>SYSTEM CONFIDENCE</span>
                   <span style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-main)' }}>{assessment.conf !== 'N/A' ? `${assessment.conf}%` : 'N/A'}</span>
@@ -192,9 +201,6 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                         <button onClick={() => setZoom(z => Math.max(z - 0.25, 0.25))} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px' }} className="hover-bright"><ZoomOut size={12} /> OUT</button>
                         <button onClick={() => setZoom(z => Math.min(z + 0.25, 4))} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px' }} className="hover-bright"><ZoomIn size={12} /> IN</button>
                         <button onClick={() => setZoom(1)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px' }} className="hover-bright"><Maximize size={12} /> FIT</button>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                        <button onClick={() => setMainTab('RAW')} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px' }} className="hover-bright"><Info size={12} /> METADATA</button>
                       </div>
                     </div>
 
