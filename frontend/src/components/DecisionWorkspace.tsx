@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Share2, Disc, Edit2, Lock, ShieldCheck, Circle, Check, Copy, Link as LinkIcon, AlertTriangle, ChevronDown, ChevronRight, Maximize, ZoomIn, Info, BrainCircuit } from 'lucide-react';
 import type { Evidence } from '../types';
 import { AssessmentEngine } from '../services/assessment';
@@ -78,6 +78,15 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
   const [c2paExpanded, setC2paExpanded] = useState(true);
   const [vitExpanded, setVitExpanded] = useState(true);
 
+  // NEW INTERACTIVE STATES
+  const [zoom, setZoom] = useState(1);
+  const [expandedCorrelation, setExpandedCorrelation] = useState<'ISSUER' | 'DAY' | null>(null);
+
+  // Reset zoom when image changes
+  useEffect(() => {
+    setZoom(1);
+  }, [evidence.id, imageTab]);
+
   const getImageUrl = (tab: string) => {
     const cacheBuster = `?t=${new Date().getTime()}`;
     if (tab === 'HEATMAP') return `${API_BASE_URL}/api/v1/evidence/${evidence.id}/heatmap${cacheBuster}`;
@@ -132,7 +141,6 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', minWidth: '200px' }}>
-              {/* Proper Confidence Badge */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px', backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px' }}>
                 <div style={{ position: 'relative', width: '32px', height: '32px', borderRadius: '50%', border: '3px solid rgba(255,255,255,0.1)', borderTopColor: assessment.conf !== 'N/A' ? `var(--c-${assessment.type})` : 'rgba(255,255,255,0.1)' }}></div>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -179,16 +187,15 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                 ) : (
                   <div style={{ width: '100%', backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', overflow: 'hidden' }}>
                     
-                    {/* Mock Toolbar */}
                     <div className="mono" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 16px', backgroundColor: '#111', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                        <span style={{ fontSize: '10px', color: 'var(--text-main)', paddingRight: '8px', borderRight: '1px solid rgba(255,255,255,0.1)' }}>100%</span>
-                        <button style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px' }} className="hover-bright"><ZoomIn size={12} /> ZOOM</button>
-                        <button style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px' }} className="hover-bright"><Maximize size={12} /> FIT</button>
+                        <span style={{ fontSize: '10px', color: 'var(--text-main)', paddingRight: '8px', borderRight: '1px solid rgba(255,255,255,0.1)' }}>{Math.round(zoom * 100)}%</span>
+                        <button onClick={() => setZoom(z => Math.min(z + 0.5, 4))} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px' }} className="hover-bright"><ZoomIn size={12} /> ZOOM</button>
+                        <button onClick={() => setZoom(1)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px' }} className="hover-bright"><Maximize size={12} /> FIT</button>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                        <button style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px' }} className="hover-bright"><Info size={12} /> METADATA</button>
-                        <button style={{ background: 'transparent', border: 'none', color: '#3b82f6', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px' }} className="hover-bright"><BrainCircuit size={12} /> TOGGLE AI OVERLAY</button>
+                        <button onClick={() => setMainTab('RAW')} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px' }} className="hover-bright"><Info size={12} /> METADATA</button>
+                        <button onClick={() => setImageTab(prev => prev === 'SOURCE' ? 'HEATMAP' : 'SOURCE')} style={{ background: 'transparent', border: 'none', color: '#3b82f6', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px' }} className="hover-bright"><BrainCircuit size={12} /> TOGGLE AI OVERLAY</button>
                       </div>
                     </div>
 
@@ -202,11 +209,13 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                       ))}
                     </div>
 
-                    <div style={{ width: '100%', aspectRatio: '16 / 9', backgroundColor: '#000', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ width: '100%', aspectRatio: '16 / 9', backgroundColor: '#000', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                       {imageFailed ? (
                         <div className="mono" style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px', letterSpacing: '0.1em' }}>{imageTab} UNAVAILABLE</div>
                       ) : (
-                        <img src={getImageUrl(imageTab)} alt={`Forensic ${imageTab}`} className="animate-fade-in" style={{ width: '100%', height: '100%', objectFit: 'contain' }} onError={() => setImageFailed(true)} onLoad={() => setImageFailed(false)} />
+                        <div style={{ transform: `scale(${zoom})`, transformOrigin: 'center center', transition: 'transform 0.2s ease', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <img src={getImageUrl(imageTab)} alt={`Forensic ${imageTab}`} className="animate-fade-in" style={{ width: '100%', height: '100%', objectFit: 'contain' }} onError={() => setImageFailed(true)} onLoad={() => setImageFailed(false)} />
+                        </div>
                       )}
                     </div>
                     
@@ -334,9 +343,23 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                          <div style={{ flex: 1, minWidth: 0 }}>
                            <div className="mono" style={{ fontSize: '10px', color: 'var(--text-faint)', letterSpacing: '0.1em', marginBottom: '4px' }}>SHARED ISSUER</div>
                            {sameIssuer.length > 0 ? (
-                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                               <span style={{ fontSize: '13px', color: 'var(--text-main)', wordBreak: 'break-word' }}>{c2pa?.issuer} ({sameIssuer.length} other assets)</span>
-                               <button style={{ background: 'transparent', border: 'none', color: '#3b82f6', fontSize: '11px', cursor: 'pointer', padding: 0 }} className="hover-bright mono">View assets ↗</button>
+                             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                                 <span style={{ fontSize: '13px', color: 'var(--text-main)', wordBreak: 'break-word' }}>{c2pa?.issuer} ({sameIssuer.length} other assets)</span>
+                                 <button onClick={() => setExpandedCorrelation(prev => prev === 'ISSUER' ? null : 'ISSUER')} style={{ background: 'transparent', border: 'none', color: '#3b82f6', fontSize: '11px', cursor: 'pointer', padding: 0 }} className="hover-bright mono">
+                                   {expandedCorrelation === 'ISSUER' ? 'Hide assets ↘' : 'View assets ↗'}
+                                 </button>
+                               </div>
+                               {expandedCorrelation === 'ISSUER' && (
+                                 <div style={{ padding: '12px', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '6px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                   {sameIssuer.map(e => (
+                                     <div key={e.id} className="mono" style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '12px' }}>{e.filename}</span>
+                                       <span style={{ color: `var(--c-${AssessmentEngine.evaluate(e).type})` }}>{AssessmentEngine.evaluate(e).conf}%</span>
+                                     </div>
+                                   ))}
+                                 </div>
+                               )}
                              </div>
                            ) : (
                              <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>No localized correlations found.</div>
@@ -349,9 +372,23 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                          <div style={{ flex: 1, minWidth: 0 }}>
                            <div className="mono" style={{ fontSize: '10px', color: 'var(--text-faint)', letterSpacing: '0.1em', marginBottom: '4px' }}>SHARED CAPTURE DAY</div>
                            {sameDay.length > 0 ? (
-                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                               <span style={{ fontSize: '13px', color: 'var(--text-main)' }}>{evidence.uploaded_at.split('T')[0]} ({sameDay.length} other assets)</span>
-                               <button style={{ background: 'transparent', border: 'none', color: '#3b82f6', fontSize: '11px', cursor: 'pointer', padding: 0 }} className="hover-bright mono">View assets ↗</button>
+                             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                                 <span style={{ fontSize: '13px', color: 'var(--text-main)' }}>{evidence.uploaded_at.split('T')[0]} ({sameDay.length} other assets)</span>
+                                 <button onClick={() => setExpandedCorrelation(prev => prev === 'DAY' ? null : 'DAY')} style={{ background: 'transparent', border: 'none', color: '#3b82f6', fontSize: '11px', cursor: 'pointer', padding: 0 }} className="hover-bright mono">
+                                   {expandedCorrelation === 'DAY' ? 'Hide assets ↘' : 'View assets ↗'}
+                                 </button>
+                               </div>
+                               {expandedCorrelation === 'DAY' && (
+                                 <div style={{ padding: '12px', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '6px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                   {sameDay.map(e => (
+                                     <div key={e.id} className="mono" style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '12px' }}>{e.filename}</span>
+                                       <span style={{ color: `var(--c-${AssessmentEngine.evaluate(e).type})` }}>{AssessmentEngine.evaluate(e).conf}%</span>
+                                     </div>
+                                   ))}
+                                 </div>
+                               )}
                              </div>
                            ) : (
                              <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>No localized correlations found.</div>
