@@ -155,21 +155,24 @@ export default function App() {
     <>
       {uploadError && <div className="toast"><AlertCircle size={16} /> {uploadError}</div>}
 
-      {isCreateModalOpen && (
-        <CreateCaseModal onClose={() => setIsCreateModalOpen(false)} onSubmit={handleCreateCase} />
-      )}
+      {/* HIGH-PRIORITY MODAL LAYER: Enforces strict top-level stacking so the dossier cannot overlap */}
+      <div style={{ position: 'relative', zIndex: 999 }}>
+        {isCreateModalOpen && (
+          <CreateCaseModal onClose={() => setIsCreateModalOpen(false)} onSubmit={handleCreateCase} />
+        )}
 
-      {caseToEdit && (
-        <EditCaseModal initialCase={caseToEdit} onClose={() => setCaseToEdit(null)} onSubmit={handleUpdateCase} />
-      )}
+        {caseToEdit && (
+          <EditCaseModal initialCase={caseToEdit} onClose={() => setCaseToEdit(null)} onSubmit={handleUpdateCase} />
+        )}
 
-      {caseToDelete && (
-        <DeleteCaseModal caseToDelete={caseToDelete} onClose={() => setCaseToDelete(null)} onConfirm={confirmDeleteCase} />
-      )}
+        {caseToDelete && (
+          <DeleteCaseModal caseToDelete={caseToDelete} onClose={() => setCaseToDelete(null)} onConfirm={confirmDeleteCase} />
+        )}
 
-      {isUploading && file && activeCase && (
-        <IngestionPipeline file={file} activeCase={activeCase} useVit={useVit} useC2pa={useC2pa} onComplete={handleUploadComplete} onError={handleUploadError} />
-      )}
+        {isUploading && file && activeCase && (
+          <IngestionPipeline file={file} activeCase={activeCase} useVit={useVit} useC2pa={useC2pa} onComplete={handleUploadComplete} onError={handleUploadError} />
+        )}
+      </div>
 
       <div className="app-container" style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', backgroundColor: '#050505' }}>
         <GlobalCommandBar />
@@ -284,6 +287,18 @@ export default function App() {
                           const c2paRan = item.ai_report?.c2pa_data?.raw_status !== "Bypassed by User";
                           const c2paVerified = item.ai_report?.c2pa_data?.is_signed === true;
 
+                          const platformStatus = item.ai_report?.platform_status;
+                          const c2paStatus = item.ai_report?.c2pa_data?.status;
+                          
+                          let finalColorType = ast.type;
+                          if (ast.type === 'crit' || platformStatus === 'CRITICAL THREAT' || c2paStatus === 'BROKEN_SIGNATURE') {
+                            finalColorType = 'crit';
+                          } else if (platformStatus === 'UNVERIFIED' || ast.type === 'review' || ast.type === 'neutral' || ast.verdict === 'UNKNOWN') {
+                            finalColorType = 'review';
+                          } else {
+                            finalColorType = 'trust';
+                          }
+
                           return (
                             <div key={item.id} role="button" tabIndex={0} onClick={() => setSelectedEvidence(item)}
                                  style={{ 
@@ -318,7 +333,7 @@ export default function App() {
                                   </div>
                                 ) : (
                                   <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-main)', fontWeight: 600 }}>
-                                    <span style={{ color: `var(--c-${ast.type})`, fontSize: '10px' }}>●</span> {ast.conf === 'N/A' ? 'N/A' : `${ast.conf}%`}
+                                    <span style={{ color: `var(--c-${finalColorType})`, fontSize: '10px' }}>●</span> {ast.conf === 'N/A' ? 'N/A' : `${ast.conf}%`}
                                   </div>
                                 )}
                               </div>
