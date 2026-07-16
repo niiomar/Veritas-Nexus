@@ -189,7 +189,7 @@ export default function App() {
           <main style={{ 
             flex: selectedEvidence ? '0 0 280px' : '1', 
             display: 'flex', flexDirection: 'column', 
-            padding: selectedEvidence ? '24px' : '64px 96px', 
+            padding: selectedEvidence ? '24px' : '48px', 
             borderRight: selectedEvidence ? '1px solid rgba(255,255,255,0.05)' : 'none',
             overflow: 'hidden', maxWidth: selectedEvidence ? '280px' : '1200px',
             transition: 'all 0.2s ease', margin: 0
@@ -209,33 +209,29 @@ export default function App() {
               </div>
             ) : (
               <>
-                <div style={{ display: 'flex', flexDirection: selectedEvidence ? 'column' : 'row', justifyContent: 'space-between', alignItems: selectedEvidence ? 'flex-start' : 'center', gap: '24px', marginBottom: '48px', flexShrink: 0 }}>
+                <div style={{ display: 'flex', flexDirection: selectedEvidence ? 'column' : 'row', justifyContent: 'space-between', alignItems: selectedEvidence ? 'flex-start' : 'center', gap: '24px', marginBottom: '24px', flexShrink: 0 }}>
                   
-                  {/* LEFT SIDE: Title Block */}
                   <div style={{ minWidth: 0, width: '100%' }}>
-                    <div className="mono" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', marginBottom: '16px', fontSize: '11px', letterSpacing: '0.15em' }}>
+                    <div className="mono" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', marginBottom: '12px', fontSize: '11px', letterSpacing: '0.15em' }}>
                       <span style={{ color: 'var(--text-faint)' }}>PRIORITY:</span>
                       <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>{activeCase.priority.toUpperCase()}</span>
-                      
                       <span style={{ color: 'var(--text-faint)', margin: '0 8px' }}>•</span>
-                      
                       <span style={{ color: 'var(--text-faint)' }}>ANALYST:</span>
                       <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>{activeCase.analyst.toUpperCase()}</span>
                     </div>
 
-                    <div style={{ fontSize: selectedEvidence ? '32px' : '48px', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.03em', lineHeight: 1, marginBottom: '12px', wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+                    <div style={{ fontSize: selectedEvidence ? '28px' : '40px', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.03em', lineHeight: 1, marginBottom: '8px', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                       {activeCase.alias}
                     </div>
 
                     {!selectedEvidence && (
-                      <div style={{ fontSize: '20px', color: 'var(--text-muted)' }}>
+                      <div style={{ fontSize: '16px', color: 'var(--text-muted)' }}>
                           {activeCase.name}
                       </div>
                     )}
                   </div>
 
-                  {/* RIGHT SIDE: Controls Block */}
-                  <div style={{ display: 'flex', flexDirection: selectedEvidence ? 'column' : 'row', alignItems: selectedEvidence ? 'flex-start' : 'center', gap: '16px', marginTop: selectedEvidence ? '12px' : '0', width: selectedEvidence ? '100%' : 'auto' }}>
+                  <div style={{ display: 'flex', flexDirection: selectedEvidence ? 'column' : 'row', alignItems: selectedEvidence ? 'flex-start' : 'center', gap: '16px', marginTop: '0', width: selectedEvidence ? '100%' : 'auto' }}>
                     <div className="mono" style={{ display: 'flex', gap: '16px', fontSize: '10px', color: 'var(--text-faint)' }}>
                       <label className="hover-bright" style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: useVit ? 'var(--text-main)' : 'var(--text-muted)' }}>
                         <input type="checkbox" checked={useVit} onChange={e => setUseVit(e.target.checked)} style={{ accentColor: 'var(--text-main)', cursor: 'pointer' }} />
@@ -255,16 +251,9 @@ export default function App() {
                         onClick={() => document.getElementById('file-upload')?.click()} 
                         style={{ 
                           width: selectedEvidence ? '100%' : 'auto',
-                          padding: '8px 16px', 
-                          background: 'transparent', 
-                          color: (!useVit && !useC2pa) ? 'var(--text-muted)' : 'var(--text-main)', 
-                          border: '1px solid', 
-                          borderColor: (!useVit && !useC2pa) ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.2)', 
-                          borderRadius: '4px', 
-                          fontWeight: 500, 
-                          fontSize: '11px', 
-                          letterSpacing: '0.1em', 
-                          cursor: (!useVit && !useC2pa) ? 'not-allowed' : 'pointer',
+                          padding: '8px 16px', background: 'transparent', color: (!useVit && !useC2pa) ? 'var(--text-muted)' : 'var(--text-main)', 
+                          border: '1px solid', borderColor: (!useVit && !useC2pa) ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.2)', 
+                          borderRadius: '4px', fontWeight: 500, fontSize: '11px', letterSpacing: '0.1em', cursor: (!useVit && !useC2pa) ? 'not-allowed' : 'pointer',
                           transition: 'all 0.2s'
                         }}
                       >
@@ -275,15 +264,15 @@ export default function App() {
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, paddingBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.05)', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, paddingBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.05)', marginBottom: '12px' }}>
                      <div className="mono" style={{ fontSize: '11px', color: 'var(--text-faint)', letterSpacing: '0.15em', fontWeight: 500 }}>EVIDENCE LEDGER</div>
                   </div>
 
                   <div style={{ flex: 1, overflowY: 'auto', paddingRight: '8px' }}>
                     {filteredEvidence.length === 0 ? (
-                      <div style={{ padding: '48px 0', color: 'var(--text-faint)', fontSize: '14px' }}>Awaiting payload ingestion.</div>
+                      <div style={{ padding: '24px 0', color: 'var(--text-faint)', fontSize: '14px' }}>Awaiting payload ingestion.</div>
                     ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                         {filteredEvidence.map((item) => {
                           const ast = AssessmentEngine.evaluate(item);
                           const isEval = item.status !== 'COMPLETED' || !item.ai_report;
@@ -299,17 +288,15 @@ export default function App() {
                             <div key={item.id} role="button" tabIndex={0} onClick={() => setSelectedEvidence(item)}
                                  style={{ 
                                    display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', 
-                                   padding: '12px', borderRadius: '6px', cursor: 'pointer', 
+                                   padding: '10px 12px', borderRadius: '6px', cursor: 'pointer', 
                                    backgroundColor: isActive ? 'rgba(255,255,255,0.04)' : 'transparent',
                                    borderLeft: isActive ? '3px solid var(--text-main)' : '3px solid transparent',
-                                   borderTop: '1px solid rgba(255,255,255,0.02)',
-                                   borderRight: '1px solid rgba(255,255,255,0.02)',
-                                   borderBottom: '1px solid rgba(255,255,255,0.02)',
+                                   borderTop: '1px solid rgba(255,255,255,0.02)', borderRight: '1px solid rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.02)',
                                    transition: 'all 0.2s'
                                  }}
                                  className="hover-bright">
                               
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0 }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
                                 <div style={{ fontWeight: 600, fontSize: '13px', color: isActive ? 'var(--text-main)' : 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                   ● {cleanName}
                                 </div>
@@ -356,7 +343,6 @@ export default function App() {
         
         {/* OPERATIONS CENTER TELEMETRY FOOTER */}
         <div className="mono" style={{ height: '40px', background: 'var(--bg-base)', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px', flexShrink: 0, zIndex: 10, fontSize: '10px', color: 'var(--text-faint)', letterSpacing: '0.1em' }}>
-          
           <div style={{ display: 'flex', gap: '48px' }}>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               ViT-CORE <span style={{ color: engineStatus.vit === 'ONLINE' ? '#10b981' : 'var(--c-crit)', fontWeight: 600 }}>{engineStatus.vit}</span>
@@ -368,15 +354,12 @@ export default function App() {
               QUEUE <span style={{ color: 'var(--text-main)' }}>{activeQueueCount}</span>
             </div>
           </div>
-
           <div style={{ display: 'flex', gap: '48px' }}>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               LAST SYNC <span style={{ color: 'var(--text-muted)' }}>{lastSync}</span>
             </div>
           </div>
-
         </div>
-
       </div>
     </>
   );
