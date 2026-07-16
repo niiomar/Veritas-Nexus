@@ -137,13 +137,14 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
       ) : (
         <div className="animate-slide-in" style={{ maxWidth: '1200px', margin: '0 auto', padding: '48px', display: 'flex', flexDirection: 'column', gap: '80px', width: '100%' }}>
           
-          <div id="section-intelligence" style={{ scrollMarginTop: '120px', display: 'grid', gridTemplateColumns: 'minmax(280px, 1fr) minmax(0, 1.5fr)', gap: '40px' }}>
-            <div>
+          <div id="section-intelligence" style={{ scrollMarginTop: '120px', display: 'flex', flexWrap: 'wrap', gap: '40px' }}>
+            {/* LEFT COLUMN */}
+            <div style={{ flex: '1 1 320px', minWidth: 0, display: 'flex', flexDirection: 'column' }}>
               <div className="mono" style={{ color: 'var(--text-faint)', fontSize: '12px', letterSpacing: '0.15em', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <span style={{ color: platformStatus === 'UNVERIFIED' ? 'var(--text-muted)' : `var(--c-${assessment.type})` }}>████</span> FINAL ASSESSMENT
               </div>
 
-              <h1 style={{ fontSize: '72px', fontWeight: 800, letterSpacing: '-0.04em', margin: '0 0 8px 0', lineHeight: 1, color: platformStatus === 'UNVERIFIED' ? 'var(--text-muted)' : `var(--c-${assessment.type})` }}>
+              <h1 style={{ fontSize: 'clamp(40px, 5vw, 72px)', fontWeight: 800, letterSpacing: '-0.04em', margin: '0 0 8px 0', lineHeight: 1, color: platformStatus === 'UNVERIFIED' ? 'var(--text-muted)' : `var(--c-${assessment.type})`, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                 {platformStatus === 'UNVERIFIED' ? 'UNVERIFIED' : assessment.verdict.toUpperCase()}
               </h1>
               
@@ -162,7 +163,8 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
               </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {/* RIGHT COLUMN */}
+            <div style={{ flex: '1.5 1 400px', minWidth: 0, display: 'flex', flexDirection: 'column' }}>
               {isVitBypassed ? (
                 <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '8px', backgroundColor: 'rgba(255,255,255,0.01)' }}>
                   <span className="mono">⚠ NEURAL INFERENCE ENGINE BYPASSED.</span>
@@ -175,7 +177,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                       <button 
                         key={tab} onClick={() => { setActiveTab(tab as any); setImageFailed(false); }}
                         className="mono hover-bright"
-                        style={{ flex: '1 1 auto', minWidth: 'max-content', padding: '12px 16px', background: 'transparent', border: 'none', borderBottom: activeTab === tab ? '2px solid #3b82f6' : '2px solid transparent', color: activeTab === tab ? 'var(--text-main)' : 'var(--text-muted)', fontSize: '10px', letterSpacing: '0.1em', cursor: 'pointer', transition: 'all 0.2s' }}
+                        style={{ flex: '1 0 auto', padding: '12px 16px', background: 'transparent', border: 'none', borderBottom: activeTab === tab ? '2px solid #3b82f6' : '2px solid transparent', color: activeTab === tab ? 'var(--text-main)' : 'var(--text-muted)', fontSize: '10px', letterSpacing: '0.1em', cursor: 'pointer', transition: 'all 0.2s' }}
                       >{tab}</button>
                     ))}
                   </div>
@@ -251,8 +253,8 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '48px' }}>
-            <div id="section-credential" style={{ scrollMarginTop: '120px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 350px), 1fr))', gap: '48px' }}>
+            <div id="section-credential" style={{ scrollMarginTop: '120px', minWidth: 0 }}>
               <div className="mono" style={{ fontSize: '11px', color: 'var(--text-faint)', letterSpacing: '0.15em', marginBottom: '24px', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '12px' }}>DIGITAL IDENTITY CREDENTIAL</div>
               
               {isC2paBypassed ? (
@@ -267,7 +269,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                      <div className="mono" style={{ color: '#10b981', fontSize: '10px', letterSpacing: '0.2em', fontWeight: 600, marginBottom: '12px' }}>
                        ✓ VERIFIED CLAIM GENERATOR
                      </div>
-                     <div style={{ fontSize: '32px', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>{c2pa.issuer}</div>
+                     <div style={{ fontSize: '32px', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em', wordBreak: 'break-word' }}>{c2pa.issuer}</div>
                    </div>
                    
                    <div className="mono" style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: '16px', fontSize: '11px', color: 'var(--text-muted)', alignItems: 'center' }}>
@@ -276,27 +278,20 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                      <div>Timestamp</div><div style={{ color: 'var(--text-main)' }}>{c2pa.timestamp}</div>
                      
                      <div>Asset Hash</div>
-                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                       <span style={{ color: 'var(--text-main)' }}>{evidence.sha256.substring(0, 32)}...</span>
-                       <button onClick={() => handleInlineCopy('HASH', evidence.sha256)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px' }} className="hover-bright">
+                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                       <span style={{ color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{evidence.sha256.substring(0, 32)}...</span>
+                       <button onClick={() => handleInlineCopy('HASH', evidence.sha256)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px', flexShrink: 0 }} className="hover-bright">
                          {copiedInline === 'HASH' ? <Check size={12} color="#10b981" /> : <Copy size={12} />}
                        </button>
                      </div>
 
                      <div>Manifest ID</div>
-                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                       <span style={{ color: 'var(--text-main)' }}>urn:uuid:{evidence.id.split('-')[0]}...</span>
-                       <button onClick={() => handleInlineCopy('MANIFEST', `urn:uuid:${evidence.id}`)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px' }} className="hover-bright">
+                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                       <span style={{ color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>urn:uuid:{evidence.id.split('-')[0]}...</span>
+                       <button onClick={() => handleInlineCopy('MANIFEST', `urn:uuid:${evidence.id}`)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px', flexShrink: 0 }} className="hover-bright">
                          {copiedInline === 'MANIFEST' ? <Check size={12} color="#10b981" /> : <Copy size={12} />}
                        </button>
                      </div>
-                     
-                     {c2pa.issuer === 'OpenAI' && (
-                       <>
-                         <div style={{ marginTop: '8px' }}>Verification</div>
-                         <div style={{ marginTop: '8px' }}><a href="https://openai.com/verification" target="_blank" rel="noreferrer" style={{ color: '#3b82f6', textDecoration: 'none' }}>Official Registry ↗</a></div>
-                       </>
-                     )}
                    </div>
                  </div>
                ) : (
@@ -306,20 +301,20 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                )}
             </div>
 
-            <div id="section-correlation" style={{ scrollMarginTop: '120px' }}>
+            <div id="section-correlation" style={{ scrollMarginTop: '120px', minWidth: 0 }}>
                <div className="mono" style={{ fontSize: '11px', color: 'var(--text-faint)', letterSpacing: '0.15em', marginBottom: '24px', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '12px' }}>EVIDENCE CORRELATION</div>
                
                <div style={{ backgroundColor: '#050505', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '24px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                     
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', paddingBottom: '20px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                       <LinkIcon size={16} color={sameIssuer.length > 0 ? '#3b82f6' : 'var(--text-faint)'} style={{ marginTop: '2px' }} />
-                       <div style={{ flex: 1 }}>
+                       <LinkIcon size={16} color={sameIssuer.length > 0 ? '#3b82f6' : 'var(--text-faint)'} style={{ marginTop: '2px', flexShrink: 0 }} />
+                       <div style={{ flex: 1, minWidth: 0 }}>
                          <div className="mono" style={{ fontSize: '10px', color: 'var(--text-faint)', letterSpacing: '0.1em', marginBottom: '4px' }}>SHARED ISSUER</div>
                          {sameIssuer.length > 0 ? (
-                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                             <span style={{ fontSize: '13px', color: 'var(--text-main)' }}>{c2pa?.issuer} ({sameIssuer.length} other assets)</span>
-                             <button style={{ background: 'transparent', border: 'none', color: '#3b82f6', fontSize: '11px', cursor: 'pointer' }} className="hover-bright mono">View assets ↗</button>
+                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                             <span style={{ fontSize: '13px', color: 'var(--text-main)', wordBreak: 'break-word' }}>{c2pa?.issuer} ({sameIssuer.length} other assets)</span>
+                             <button style={{ background: 'transparent', border: 'none', color: '#3b82f6', fontSize: '11px', cursor: 'pointer', padding: 0 }} className="hover-bright mono">View assets ↗</button>
                            </div>
                          ) : (
                            <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>No localized correlations found.</div>
@@ -328,13 +323,13 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', paddingBottom: '20px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                       <LinkIcon size={16} color={sameDay.length > 0 ? '#3b82f6' : 'var(--text-faint)'} style={{ marginTop: '2px' }} />
-                       <div style={{ flex: 1 }}>
+                       <LinkIcon size={16} color={sameDay.length > 0 ? '#3b82f6' : 'var(--text-faint)'} style={{ marginTop: '2px', flexShrink: 0 }} />
+                       <div style={{ flex: 1, minWidth: 0 }}>
                          <div className="mono" style={{ fontSize: '10px', color: 'var(--text-faint)', letterSpacing: '0.1em', marginBottom: '4px' }}>SHARED CAPTURE DAY</div>
                          {sameDay.length > 0 ? (
-                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                              <span style={{ fontSize: '13px', color: 'var(--text-main)' }}>{evidence.uploaded_at.split('T')[0]} ({sameDay.length} other assets)</span>
-                             <button style={{ background: 'transparent', border: 'none', color: '#3b82f6', fontSize: '11px', cursor: 'pointer' }} className="hover-bright mono">View assets ↗</button>
+                             <button style={{ background: 'transparent', border: 'none', color: '#3b82f6', fontSize: '11px', cursor: 'pointer', padding: 0 }} className="hover-bright mono">View assets ↗</button>
                            </div>
                          ) : (
                            <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>No localized correlations found.</div>
@@ -343,8 +338,8 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
-                       <AlertTriangle size={16} color={sameIssuer.length > 0 || sameDay.length > 0 ? '#f59e0b' : '#10b981'} style={{ marginTop: '2px' }} />
-                       <div>
+                       <AlertTriangle size={16} color={sameIssuer.length > 0 || sameDay.length > 0 ? '#f59e0b' : '#10b981'} style={{ marginTop: '2px', flexShrink: 0 }} />
+                       <div style={{ minWidth: 0 }}>
                          <div className="mono" style={{ fontSize: '10px', color: 'var(--text-faint)', letterSpacing: '0.1em', marginBottom: '4px' }}>CAMPAIGN RISK PATTERN</div>
                          <div style={{ fontSize: '13px', color: sameIssuer.length > 0 || sameDay.length > 0 ? '#f59e0b' : '#10b981' }}>
                            {sameIssuer.length > 0 || sameDay.length > 0 ? 'Elevated (Related evidence chains detected)' : 'Low (Isolated asset)'}
@@ -362,9 +357,9 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                 RAW DATA EXTRACTION
              </div>
 
-             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '24px' }}>
+             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 400px), 1fr))', gap: '24px' }}>
                
-               <div style={{ backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+               <div style={{ backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                  <div className="mono" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)', backgroundColor: '#111' }}>
                    <span style={{ fontSize: '10px', color: 'var(--text-faint)', letterSpacing: '0.1em' }}>C2PA_MANIFEST.JSON</span>
                    <button onClick={() => handleCopy('C2PA', evidence.ai_report?.c2pa_data)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px' }} className="hover-bright">
@@ -376,7 +371,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                  </div>
                </div>
 
-               <div style={{ backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+               <div style={{ backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                  <div className="mono" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)', backgroundColor: '#111' }}>
                    <span style={{ fontSize: '10px', color: 'var(--text-faint)', letterSpacing: '0.1em' }}>VIT_INFERENCE.JSON</span>
                    <button onClick={() => handleCopy('VIT', { deepfake_probability: evidence.ai_report?.deepfake_probability ?? null, platform_status: evidence.ai_report?.platform_status || 'UNKNOWN', disposition: evidence.ai_report?.disposition || 'No disposition available' })} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px' }} className="hover-bright">
