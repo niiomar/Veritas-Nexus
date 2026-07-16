@@ -63,6 +63,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
   
   const isVitBypassed = vitProb === null;
   const isC2paBypassed = c2pa?.raw_status === "Bypassed by User";
+  const isC2paBroken = c2pa?.status === "BROKEN_SIGNATURE"; // <--- NEW STRICT TAMPERING CHECK
   
   const history = c2pa?.manifest_history?.length 
     ? c2pa.manifest_history 
@@ -78,11 +79,9 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
   const [c2paExpanded, setC2paExpanded] = useState(true);
   const [vitExpanded, setVitExpanded] = useState(true);
 
-  // NEW INTERACTIVE STATES
   const [zoom, setZoom] = useState(1);
   const [expandedCorrelation, setExpandedCorrelation] = useState<'ISSUER' | 'DAY' | null>(null);
 
-  // Reset zoom when image changes
   useEffect(() => {
     setZoom(1);
   }, [evidence.id, imageTab]);
@@ -245,11 +244,17 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
               <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
                 <div style={{ backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '32px' }}>
                   {isC2paBypassed ? (
-                    <div style={{ padding: '32px', color: 'var(--text-muted)', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '6px', textAlign: 'center' }}>
+                    <div style={{ padding: '48px 32px', color: 'var(--text-muted)', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '6px', textAlign: 'center' }}>
                       <span className="mono" style={{ fontSize: '12px' }}>⚠ CRYPTOGRAPHIC VERIFICATION BYPASSED BY USER.</span>
                     </div>
+                  ) : isC2paBroken ? (
+                    <div style={{ padding: '48px 32px', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '6px', textAlign: 'center', backgroundColor: 'rgba(239,68,68,0.05)' }}>
+                      <AlertTriangle size={32} style={{ margin: '0 auto 16px', opacity: 0.8 }} />
+                      <div className="mono" style={{ fontSize: '14px', letterSpacing: '0.1em', fontWeight: 600, marginBottom: '8px' }}>CRITICAL: TAMPERED PROVENANCE DETECTED</div>
+                      <div style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '400px', margin: '0 auto' }}>The cryptographic signature attached to this asset is invalid. The file has likely been maliciously altered since it was originally signed.</div>
+                    </div>
                   ) : !c2pa?.is_signed ? (
-                    <div style={{ padding: '32px', color: 'var(--text-muted)', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '6px', textAlign: 'center' }}>
+                    <div style={{ padding: '48px 32px', color: 'var(--text-muted)', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '6px', textAlign: 'center' }}>
                       <span className="mono" style={{ fontSize: '12px' }}>⚠ NO PROVENANCE GRAPH AVAILABLE (UNSIGNED ASSET).</span>
                     </div>
                   ) : (
@@ -283,8 +288,14 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
             {mainTab === 'CREDENTIAL' && (
               <div style={{ maxWidth: '800px', margin: '0 auto' }}>
                 {isC2paBypassed ? (
-                  <div style={{ padding: '48px', color: 'var(--text-muted)', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '6px', textAlign: 'center' }}>
+                  <div style={{ padding: '48px 32px', color: 'var(--text-muted)', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '6px', textAlign: 'center' }}>
                     <span className="mono">⚠ CRYPTOGRAPHIC VERIFICATION BYPASSED.</span>
+                  </div>
+                ) : isC2paBroken ? (
+                  <div style={{ padding: '48px 32px', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '6px', textAlign: 'center', backgroundColor: 'rgba(239,68,68,0.05)' }}>
+                    <AlertTriangle size={32} style={{ margin: '0 auto 16px', opacity: 0.8 }} />
+                    <div className="mono" style={{ fontSize: '14px', letterSpacing: '0.1em', fontWeight: 600, marginBottom: '8px' }}>IDENTITY VERIFICATION FAILED</div>
+                    <div style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '400px', margin: '0 auto' }}>Issuer credentials cannot be trusted. The signature hash does not match the asset's current state.</div>
                   </div>
                 ) : c2pa?.is_signed ? (
                    <div style={{ backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '12px', padding: '32px', position: 'relative', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.4)' }}>
@@ -327,7 +338,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                      </div>
                    </div>
                  ) : (
-                   <div className="mono" style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '24px', backgroundColor: 'rgba(255,0,0,0.05)', border: '1px solid rgba(255,0,0,0.1)', borderRadius: '8px' }}>
+                   <div className="mono" style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '48px 32px', backgroundColor: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '8px', textAlign: 'center' }}>
                      ⚠ No valid cryptographic signature detected on asset.
                    </div>
                  )}
