@@ -386,6 +386,20 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                               ) : 'NO'}
                             </span>
                           </div>
+                          {/* Advanced CV Flags */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>Error Level Analysis (ELA)</span>
+                            <span style={{ color: exif.anomalies.ela_anomaly ? 'var(--c-crit)' : '#10b981', fontWeight: 600 }}>{exif.anomalies.ela_anomaly ? 'ANOMALY DETECTED' : 'CLEAN'}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>Double Compression (JPEG)</span>
+                            <span style={{ color: exif.anomalies.double_compression ? 'var(--c-warn)' : '#10b981', fontWeight: 600 }}>{exif.anomalies.double_compression ? 'DETECTED' : 'CLEAN'}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>Color Profile Mismatch</span>
+                            <span style={{ color: exif.anomalies.color_profile_mismatch ? 'var(--c-warn)' : '#10b981', fontWeight: 600 }}>{exif.anomalies.color_profile_mismatch ? 'YES (Suspect)' : 'NO'}</span>
+                          </div>
+                          {/* Standard Flags */}
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <span style={{ color: 'var(--text-muted)' }}>Embedded EXIF GPS</span>
                             <span style={{ color: exif.anomalies.gps_present ? '#38bdf8' : 'var(--text-faint)' }}>{exif.anomalies.gps_present ? 'PRESENT' : 'ABSENT'}</span>
@@ -443,6 +457,13 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                             <div style={{ color: 'var(--text-faint)', marginBottom: '4px' }}>Focal Length</div>
                             <div style={{ color: 'var(--text-main)' }}>{exif.extended?.focal_length || 'Unknown'}</div>
                           </div>
+                          
+                          {/* Visual DNA Injection */}
+                          <div style={{ gridColumn: '1 / -1' }}>
+                            <div style={{ color: 'var(--text-faint)', marginBottom: '4px' }}>Perceptual Hash (Visual DNA) <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>(Resists Spoliation)</span></div>
+                            <div style={{ color: '#38bdf8', fontFamily: 'monospace', letterSpacing: '0.1em' }}>{exif.extended?.phash || 'Unknown'}</div>
+                          </div>
+
                           <div style={{ gridColumn: '1 / -1' }}>
                             <div style={{ color: 'var(--text-faint)', marginBottom: '4px' }}>Recovered Coordinates <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>(Source: {exif.anomalies.gps_present ? 'EXIF Header' : 'MakerNotes/Inferred'})</span></div>
                             <div style={{ color: exif.extended?.coordinates !== 'None Detected' ? '#38bdf8' : 'var(--text-main)' }}>{exif.extended?.coordinates || 'None Detected'}</div>
