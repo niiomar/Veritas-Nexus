@@ -251,7 +251,7 @@ async def get_attention(evidence_id: uuid.UUID, db: AsyncSession = Depends(get_d
 
 @router.delete("/{evidence_id}", tags=["Evidence"])
 async def delete_evidence(evidence_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
-    """Deletes evidence record and associated physical file."""
+    """Deletes evidence record, child dependencies, and the physical file."""
     try:
         # 1. Locate the physical file path
         stmt = text("SELECT storage_uri FROM core.evidence WHERE id = :id")
@@ -261,13 +261,21 @@ async def delete_evidence(evidence_id: uuid.UUID, db: AsyncSession = Depends(get
         if record:
             file_path = Path(record.storage_uri)
             if file_path.exists():
-                os.remove(file_path)
+                try:
+                    os.remove(file_path)
+                except OSError as e:
+                    logger.warning(f"Could not remove physical file {file_path}: {e}")
 
-        # 2. Delete the database record
+        # 2. CLEAR DEPENDENCIES: Delete child records to prevent PostgreSQL Integrity Errors
+        await db.execute(text("DELETE FROM analysis.analysis_jobs WHERE evidence_id = :id"), {"id": str(evidence_id)})
+        
+        # 3. Delete the parent evidence record
         await db.execute(text("DELETE FROM core.evidence WHERE id = :id"), {"id": str(evidence_id)})
+        
         await db.commit()
         
-        return {"status": "success", "message": "Evidence deleted."}
+        return {"status": "success", "message": "Evidence completely purged."}
     except Exception as e:
         await db.rollback()
+        logger.error(f"Deletion failed for {evidence_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Delete failed: {str(e)}")
