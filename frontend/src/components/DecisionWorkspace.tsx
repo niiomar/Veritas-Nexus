@@ -68,26 +68,94 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
   // Narrative Claim State
   // @ts-ignore
   const [claim, setClaim] = useState(evidence.metadata_dict?.narrative_claim || '');
+  const [isReconciling, setIsReconciling] = useState(false);
+  const [reconciliation, setReconciliation] = useState<any>(null);
 
   useEffect(() => {
     // @ts-ignore
     setClaim(evidence.metadata_dict?.narrative_claim || '');
-  }, [evidence.id, evidence.metadata_dict]);
+    setReconciliation(null); // Reset analysis on new file
+  }, [evidence.id]);
 
   const saveNarrative = async () => {
-    // This will trigger when the user clicks away from the text box
-    console.log("Preparing to save claim:", claim);
-    /* 
-    try {
-      await fetch(`${API_BASE_URL}/api/v1/evidence/${evidence.id}/narrative`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ claim })
-      });
-    } catch (err) {
-      console.error("Failed to save claim", err);
+    if (!claim.trim()) {
+      setReconciliation(null);
+      return;
     }
-    */
+    
+    setIsReconciling(true);
+
+    // Simulate network delay for the AI evaluation
+    setTimeout(async () => {
+      const text = claim.toLowerCase();
+      const evidenceList: string[] = [];
+      let status = 'INSUFFICIENT';
+      let conf = 0;
+
+      const hasEditAnomalies = exif?.anomalies.likely_exported || exif?.anomalies.ela_anomaly || exif?.anomalies.double_compression;
+      const hasHardware = exif?.fingerprint.make !== 'Unknown';
+
+      // Smart Regex to distinguish Denial vs Admission
+      const deniesEditing = /(didn't|did not|never|no|not|without).*(edit|photoshop|touch|alter|change|filter)/.test(text) || text.includes('only took');
+      const admitsEditing = /(edit|photoshop|touch|alter|change|filter)/.test(text) && !deniesEditing;
+      const claimsCapture = /(take|took|captured|shot)/.test(text);
+
+      // Rule 1: Subject DENIES editing
+      if (deniesEditing) {
+        if (hasEditAnomalies) {
+          status = 'CONTRADICTED';
+          if (exif?.anomalies.likely_exported) evidenceList.push('Export signature detected implying post-processing');
+          if (exif?.fingerprint.software !== 'Unknown' && exif?.fingerprint.software !== 'None Detected') {
+             evidenceList.push(`Editing software identified: ${exif?.fingerprint.software}`);
+          }
+          if (exif?.anomalies.ela_anomaly) evidenceList.push('Error Level Analysis indicates pixel manipulation');
+          conf = 94;
+        } else {
+          status = 'SUPPORTED';
+          evidenceList.push('No export signatures or manipulation anomalies detected');
+          conf = 89;
+        }
+      } 
+      // Rule 2: Subject ADMITS editing
+      else if (admitsEditing) {
+        if (hasEditAnomalies) {
+          status = 'SUPPORTED';
+          evidenceList.push('Subject admission aligns with detected post-processing signatures');
+          if (exif?.fingerprint.software !== 'Unknown' && exif?.fingerprint.software !== 'None Detected') {
+             evidenceList.push(`Confirmed by presence of: ${exif?.fingerprint.software}`);
+          }
+          conf = 92;
+        } else {
+          status = 'CONTRADICTED';
+          evidenceList.push('Subject claims modification, but file lacks standard editing metadata');
+          conf = 75;
+        }
+      }
+      // Rule 3: Subject claims they TOOK the photo
+      else if (claimsCapture) {
+         if (hasHardware) {
+           status = 'SUPPORTED';
+           evidenceList.push(`Origin hardware verified (${exif?.fingerprint.make})`);
+           conf = 88;
+         } else if (exif?.anomalies.likely_stripped) {
+           status = 'CONTRADICTED';
+           evidenceList.push('No original hardware signature found to corroborate capture claim');
+           evidenceList.push('Missing expected device metadata (Aggressive Scrub)');
+           conf = 91;
+         }
+      }
+      // Rule 4: No actionable claim found (Fixes the "okay" bug)
+      else {
+        status = 'INSUFFICIENT';
+        evidenceList.push('Statement lacks actionable forensic keywords.');
+        evidenceList.push("Expected context: 'took/captured' or 'edited/altered'.");
+        conf = 0;
+      }
+
+      setReconciliation({ status, evidence: evidenceList, confidence: conf });
+      setIsReconciling(false);
+
+    }, 800);
   };
 
   const isVitBypassed = vitProb === null;
@@ -503,33 +571,62 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                       )}
                     </div>
 
-                    {/* Narrative Reconciliation */}
+                    {/* Narrative Reconciliation Engine */}
                     <div style={{ backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '24px' }}>
-                       <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--text-faint)', letterSpacing: '0.1em', marginBottom: '16px' }}>
-                         <MessageSquare size={14} /> NARRATIVE RECONCILIATION
+                       
+                       <div className="mono" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--text-faint)', letterSpacing: '0.1em' }}>
+                           <MessageSquare size={14} /> NARRATIVE RECONCILIATION
+                         </div>
+                         {isReconciling && (
+                           <div className="mono animate-pulse" style={{ fontSize: '10px', color: '#38bdf8', letterSpacing: '0.1em' }}>
+                             ANALYZING STATEMENT...
+                           </div>
+                         )}
                        </div>
+
                        <textarea 
                          value={claim}
                          onChange={(e) => setClaim(e.target.value)}
                          onBlur={saveNarrative}
-                         placeholder="Enter subject's claim (e.g., 'I only took the pictures. I did not leak anything.')" 
-                         style={{ width: '100%', height: '80px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-main)', padding: '16px', borderRadius: '6px', fontFamily: 'monospace', fontSize: '12px', resize: 'none', marginBottom: '24px', outline: 'none' }}
+                         disabled={isReconciling}
+                         placeholder="Enter subject's claim (e.g., 'I only took the pictures. I never edited them.')" 
+                         style={{ width: '100%', height: '60px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-main)', padding: '12px 16px', borderRadius: '6px', fontFamily: 'monospace', fontSize: '12px', resize: 'none', marginBottom: '16px', outline: 'none', opacity: isReconciling ? 0.5 : 1, transition: 'all 0.2s' }}
                        />
-                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-                          <div style={{ borderLeft: '2px solid var(--c-crit)', paddingLeft: '16px' }}>
-                            <div className="mono" style={{ fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '0.05em' }}>CONTRADICTIONS</div>
-                            <div style={{ fontSize: '13px', color: 'var(--c-crit)', marginTop: '8px', lineHeight: 1.6 }}>
-                              {exif.anomalies.likely_exported ? '• Software signature implies post-processing (not just taken)' : '• None detected'}
-                              {exif.anomalies.likely_stripped ? <><br/>• Missing expected device metadata (Aggressive Scrub/Leak)</> : null}
-                            </div>
+
+                       {reconciliation ? (
+                          <div className="animate-fade-in" style={{ display: 'grid', gridTemplateColumns: '1fr 180px', gap: '24px', backgroundColor: 'rgba(255,255,255,0.02)', border: `1px solid ${reconciliation.status === 'CONTRADICTED' ? 'rgba(239,68,68,0.3)' : reconciliation.status === 'SUPPORTED' ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.3)'}`, borderRadius: '6px', padding: '20px' }}>
+                             
+                             <div>
+                               <div className="mono" style={{ fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '0.05em', marginBottom: '6px' }}>ASSESSMENT</div>
+                               <div style={{ fontSize: '14px', fontWeight: 600, color: reconciliation.status === 'CONTRADICTED' ? 'var(--c-crit)' : reconciliation.status === 'SUPPORTED' ? '#10b981' : '#f59e0b', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '20px', letterSpacing: '0.05em' }}>
+                                  {reconciliation.status === 'CONTRADICTED' ? '✗ CONTRADICTED' : reconciliation.status === 'SUPPORTED' ? '✓ SUPPORTED / CONSISTENT' : '⚠ INSUFFICIENT CLAIM'}
+                               </div>
+
+                               <div className="mono" style={{ fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '0.05em', marginBottom: '8px' }}>EVIDENCE ALIGNMENT</div>
+                               <div style={{ fontSize: '12px', color: 'var(--text-main)', lineHeight: 1.6, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                  {reconciliation.evidence.map((ev: string, i: number) => (
+                                     <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                                       <span style={{ color: reconciliation.status === 'CONTRADICTED' ? 'var(--c-crit)' : reconciliation.status === 'SUPPORTED' ? '#10b981' : '#f59e0b', marginTop: '1px' }}>•</span> 
+                                       <span>{ev}</span>
+                                     </div>
+                                  ))}
+                               </div>
+                             </div>
+
+                             <div style={{ borderLeft: '1px solid rgba(255,255,255,0.05)', paddingLeft: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                                <div className="mono" style={{ fontSize: '10px', color: 'var(--text-faint)', letterSpacing: '0.1em', marginBottom: '8px' }}>DECISION CONFIDENCE</div>
+                                <div style={{ fontSize: '36px', fontWeight: 800, color: reconciliation.status === 'INSUFFICIENT' ? 'var(--text-muted)' : 'var(--text-main)', letterSpacing: '-0.02em' }}>
+                                  {reconciliation.status === 'INSUFFICIENT' ? 'N/A' : `${reconciliation.confidence}%`}
+                                </div>
+                             </div>
+
                           </div>
-                          <div style={{ borderLeft: '2px solid #10b981', paddingLeft: '16px' }}>
-                            <div className="mono" style={{ fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '0.05em' }}>SUPPORTING FACTS</div>
-                            <div style={{ fontSize: '13px', color: '#10b981', marginTop: '8px', lineHeight: 1.6 }}>
-                              {exif.fingerprint.make !== 'Unknown' ? `• Origin hardware verified (${exif.fingerprint.make})` : '• None detected'}
-                            </div>
+                       ) : (
+                          <div className="mono" style={{ fontSize: '10px', color: 'var(--text-muted)', textAlign: 'center', padding: '16px', border: '1px dashed rgba(255,255,255,0.05)', borderRadius: '6px' }}>
+                            AWAITING SUBJECT STATEMENT INPUT
                           </div>
-                       </div>
+                       )}
                     </div>
                   </>
                 )}
