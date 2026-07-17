@@ -65,6 +65,31 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
   // @ts-ignore
   const exif = evidence.metadata_dict?.exif;
 
+  // Narrative Claim State
+  // @ts-ignore
+  const [claim, setClaim] = useState(evidence.metadata_dict?.narrative_claim || '');
+
+  useEffect(() => {
+    // @ts-ignore
+    setClaim(evidence.metadata_dict?.narrative_claim || '');
+  }, [evidence.id, evidence.metadata_dict]);
+
+  const saveNarrative = async () => {
+    // This will trigger when the user clicks away from the text box
+    console.log("Preparing to save claim:", claim);
+    /* 
+    try {
+      await fetch(`${API_BASE_URL}/api/v1/evidence/${evidence.id}/narrative`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ claim })
+      });
+    } catch (err) {
+      console.error("Failed to save claim", err);
+    }
+    */
+  };
+
   const isVitBypassed = vitProb === null;
   const isC2paBypassed = c2pa?.raw_status === "Bypassed by User";
   const isC2paBroken = c2pa?.status === "BROKEN_SIGNATURE";
@@ -163,10 +188,37 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px', backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px' }}>
                 <div style={{ position: 'relative', width: '32px', height: '32px', borderRadius: '50%', border: '3px solid rgba(255,255,255,0.1)', borderTopColor: assessment.conf !== 'N/A' ? `var(--c-${finalColorType})` : 'rgba(255,255,255,0.1)' }}></div>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <span className="mono" style={{ fontSize: '10px', color: 'var(--text-faint)', letterSpacing: '0.1em' }}>SYSTEM CONFIDENCE</span>
+                  <span className="mono" style={{ fontSize: '10px', color: 'var(--text-faint)', letterSpacing: '0.1em' }}>EVIDENCE INTEGRITY</span>
                   <span style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-main)' }}>{assessment.conf !== 'N/A' ? `${assessment.conf}%` : 'N/A'}</span>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* EXECUTIVE EVIDENCE SUMMARY */}
+          <div style={{ padding: '0 48px 24px 48px', backgroundColor: 'rgba(255,255,255,0.01)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px', padding: '16px', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', backgroundColor: '#0a0a0c' }}>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
+                {exif?.fingerprint.make !== 'Unknown' ? <Check size={14} color="#10b981" /> : <AlertTriangle size={14} color="#f59e0b" />}
+                <span style={{ color: 'var(--text-muted)' }}>Original hardware {exif?.fingerprint.make !== 'Unknown' ? `identified (${exif?.fingerprint.make})` : 'obscured'}</span>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
+                {exif?.anomalies.likely_exported ? <AlertTriangle size={14} color="#f59e0b" /> : <Check size={14} color="#10b981" />}
+                <span style={{ color: 'var(--text-muted)' }}>Export signature {exif?.anomalies.likely_exported ? 'present' : 'clean'}</span>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
+                {c2pa?.is_signed ? <Check size={14} color="#10b981" /> : <span style={{ color: '#ef4444' }}>✕</span>}
+                <span style={{ color: 'var(--text-muted)' }}>{c2pa?.is_signed ? 'Cryptographic provenance verified' : 'No C2PA provenance found'}</span>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
+                {anomalyCount > 0 ? <span style={{ color: '#ef4444' }}>✕</span> : <Check size={14} color="#10b981" />}
+                <span style={{ color: 'var(--text-muted)' }}>{anomalyCount > 0 ? `High AI synthesis probability (${anomalyCount} regions)` : 'Low AI synthesis probability'}</span>
+              </div>
+
             </div>
           </div>
 
@@ -326,12 +378,16 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                             <span style={{ color: 'var(--text-muted)' }}>Metadata Stripped</span>
                             <span style={{ color: exif.anomalies.likely_stripped ? 'var(--c-crit)' : '#10b981', fontWeight: 600 }}>{exif.anomalies.likely_stripped ? 'YES (Suspect)' : 'NO'}</span>
                           </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <span style={{ color: 'var(--text-muted)' }}>Export Signatures</span>
-                            <span style={{ color: exif.anomalies.likely_exported ? 'var(--c-warn)' : '#10b981', fontWeight: 600 }}>{exif.anomalies.likely_exported ? 'YES (Modified)' : 'NO'}</span>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>Export Pipeline</span>
+                            <span style={{ color: exif.anomalies.likely_exported ? 'var(--c-warn)' : '#10b981', fontWeight: 600, textAlign: 'right' }}>
+                              {exif.anomalies.likely_exported ? (
+                                <>DETECTED <span style={{ fontSize: '9px', color: 'var(--text-faint)', display: 'block', fontWeight: 400 }}>Likely: {exif.fingerprint.software !== 'Unknown' ? exif.fingerprint.software : 'Unknown Encoder'}</span></>
+                              ) : 'NO'}
+                            </span>
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <span style={{ color: 'var(--text-muted)' }}>GPS Coordinates</span>
+                            <span style={{ color: 'var(--text-muted)' }}>Embedded EXIF GPS</span>
                             <span style={{ color: exif.anomalies.gps_present ? '#38bdf8' : 'var(--text-faint)' }}>{exif.anomalies.gps_present ? 'PRESENT' : 'ABSENT'}</span>
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -388,7 +444,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                             <div style={{ color: 'var(--text-main)' }}>{exif.extended?.focal_length || 'Unknown'}</div>
                           </div>
                           <div style={{ gridColumn: '1 / -1' }}>
-                            <div style={{ color: 'var(--text-faint)', marginBottom: '4px' }}>Extracted GPS Coordinates</div>
+                            <div style={{ color: 'var(--text-faint)', marginBottom: '4px' }}>Recovered Coordinates <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>(Source: {exif.anomalies.gps_present ? 'EXIF Header' : 'MakerNotes/Inferred'})</span></div>
                             <div style={{ color: exif.extended?.coordinates !== 'None Detected' ? '#38bdf8' : 'var(--text-main)' }}>{exif.extended?.coordinates || 'None Detected'}</div>
                           </div>
                         </div>
@@ -423,6 +479,9 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                          <MessageSquare size={14} /> NARRATIVE RECONCILIATION
                        </div>
                        <textarea 
+                         value={claim}
+                         onChange={(e) => setClaim(e.target.value)}
+                         onBlur={saveNarrative}
                          placeholder="Enter subject's claim (e.g., 'I only took the pictures. I did not leak anything.')" 
                          style={{ width: '100%', height: '80px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-main)', padding: '16px', borderRadius: '6px', fontFamily: 'monospace', fontSize: '12px', resize: 'none', marginBottom: '24px', outline: 'none' }}
                        />
