@@ -115,7 +115,6 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
     setTimeout(() => setCopiedInline(null), 2000);
   };
 
-  // NEW ANOMALY LOGIC
   const anomalyCount = typeof vitProb === 'number' ? Math.min(Math.floor(vitProb * 6), 5) : 0;
   const anomalyText = anomalyCount > 0 ? `${anomalyCount} SUSPICIOUS AREA${anomalyCount > 1 ? 'S' : ''}` : 'NONE DETECTED';
   const anomalyColor = anomalyCount > 0 ? 'var(--c-crit)' : 'var(--text-main)';
@@ -127,8 +126,8 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
     <div className="decision-workspace" style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', backgroundColor: '#050505', position: 'relative' }}>
       <style>{dossierStyles}</style>
       
-      {/* GLOBAL HEADER */}
-      <div style={{ flexShrink: 0, padding: '24px 48px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      {/* GLOBAL HEADER - TIGHTENED PADDING */}
+      <div style={{ flexShrink: 0, padding: '16px 48px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div className="mono" style={{ fontSize: '11px', letterSpacing: '0.15em', fontWeight: 500, color: 'var(--text-faint)' }}>VERITAS NEXUS / DOSSIER</div>
         <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '11px', letterSpacing: '0.1em' }} className="mono hover-bright">CLOSE ✕</button>
       </div>
@@ -138,13 +137,13 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
       ) : (
         <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
           
-          {/* STABLE INVESTIGATION CONTEXT */}
-          <div style={{ flexShrink: 0, padding: '32px 48px', backgroundColor: 'rgba(255,255,255,0.01)', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexWrap: 'wrap', gap: '32px', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          {/* STABLE INVESTIGATION CONTEXT - TIGHTENED PADDING */}
+          <div style={{ flexShrink: 0, padding: '20px 48px', backgroundColor: 'rgba(255,255,255,0.01)', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexWrap: 'wrap', gap: '32px', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div style={{ flex: 1, minWidth: '300px' }}>
               <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '11px', letterSpacing: '0.1em', color: 'var(--text-faint)', marginBottom: '8px' }}>
                 <span style={{ color: `var(--c-${finalColorType})` }}>████</span> EVIDENCE ASSESSMENT
               </div>
-              <div style={{ fontSize: '32px', fontWeight: 800, color: `var(--c-${finalColorType})`, letterSpacing: '-0.02em', marginBottom: '16px' }}>
+              <div style={{ fontSize: '32px', fontWeight: 800, color: `var(--c-${finalColorType})`, letterSpacing: '-0.02em', marginBottom: '12px' }}>
                 {platformStatus === 'UNVERIFIED' ? 'UNVERIFIED' : assessment.verdict.toUpperCase()}
               </div>
               <div style={{ fontSize: '14px', color: 'var(--text-main)', lineHeight: 1.5 }}>
@@ -163,7 +162,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
             </div>
           </div>
 
-          {/* TAB NAVIGATION */}
+          {/* TAB NAVIGATION - TIGHTENED PADDING */}
           <div className="no-scrollbar mono" style={{ flexShrink: 0, display: 'flex', gap: '32px', padding: '0 48px', borderBottom: '1px solid rgba(255,255,255,0.05)', overflowX: 'auto' }}>
             {[
               { id: 'MEDIA', label: 'MEDIA VIEW' },
@@ -177,7 +176,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                 onClick={() => setMainTab(tab.id as any)} 
                 className="hover-bright" 
                 style={{ 
-                  background: 'transparent', border: 'none', padding: '16px 0', cursor: 'pointer', whiteSpace: 'nowrap', fontSize: '11px', letterSpacing: '0.1em',
+                  background: 'transparent', border: 'none', padding: '12px 0', cursor: 'pointer', whiteSpace: 'nowrap', fontSize: '11px', letterSpacing: '0.1em',
                   color: mainTab === tab.id ? 'var(--text-main)' : 'var(--text-muted)',
                   borderBottom: mainTab === tab.id ? '2px solid #3b82f6' : '2px solid transparent'
                 }}
@@ -187,8 +186,8 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
             ))}
           </div>
 
-          {/* TAB CONTENT AREA */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '32px 48px' }}>
+          {/* TAB CONTENT AREA - TIGHTENED PADDING */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '24px 48px' }}>
             
             {mainTab === 'MEDIA' && (
               <div style={{ display: 'flex', flexDirection: 'column', width: '100%', maxWidth: '1000px', margin: '0 auto', gap: '24px' }}>
@@ -221,7 +220,8 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                       ))}
                     </div>
 
-                    <div style={{ width: '100%', aspectRatio: '16 / 9', backgroundColor: '#000', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                    {/* DYNAMIC VIEWPORT CLAMP - REPLACES FIXED 16:9 ASPECT RATIO */}
+                    <div style={{ width: '100%', height: 'clamp(300px, 40vh, 480px)', backgroundColor: '#000', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                       {imageFailed ? (
                         <div className="mono" style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px', letterSpacing: '0.1em' }}>{imageTab} UNAVAILABLE</div>
                       ) : (
@@ -250,7 +250,6 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                         <div className="mono" style={{ fontSize: '13px', color: anomalyColor, fontWeight: 600 }}>
                           {anomalyText}
                         </div>
-                        {/* Micro-caption explains exactly what this means to the analyst */}
                         <div style={{ fontSize: '9px', color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'none' }}>
                           {anomalyCount > 0 ? 'Review heatmap for localization' : 'No localized threats found'}
                         </div>
