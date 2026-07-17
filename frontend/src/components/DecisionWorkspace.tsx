@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
-import { Disc, Edit2, Lock, ShieldCheck, Circle, Check, Copy, Link as LinkIcon, AlertTriangle, ChevronDown, ChevronRight, Maximize, ZoomIn, ZoomOut, Info, Camera, Clock, FileMinus, MessageSquare } from 'lucide-react';
+import { Disc, Edit2, Lock, ShieldCheck, Circle, Check, Copy, Link as LinkIcon, AlertTriangle, ChevronDown, ChevronRight, Maximize, ZoomIn, ZoomOut, Info, Camera, Clock, FileMinus, MessageSquare, Target } from 'lucide-react';
 import type { Evidence } from '../types';
 import { AssessmentEngine } from '../services/assessment';
 
@@ -348,6 +348,52 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                           </div>
                         </div>
                       </div>
+                      
+                      {/* NEW CARD: Extended File & Telemetry Attributes */}
+                      <div style={{ backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '24px', gridColumn: '1 / -1' }}>
+                        <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--text-faint)', letterSpacing: '0.1em', marginBottom: '16px' }}>
+                          <Target size={14} /> FILE & TELEMETRY ATTRIBUTES
+                        </div>
+                        <div className="mono" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                          <div>
+                            <div style={{ color: 'var(--text-faint)', marginBottom: '4px' }}>MIME Type</div>
+                            <div style={{ color: 'var(--text-main)' }}>{exif.extended?.mime_type || 'Unknown'}</div>
+                          </div>
+                          <div>
+                            <div style={{ color: 'var(--text-faint)', marginBottom: '4px' }}>Dimensions</div>
+                            <div style={{ color: 'var(--text-main)' }}>{exif.extended?.dimensions || 'Unknown'}</div>
+                          </div>
+                          <div>
+                            <div style={{ color: 'var(--text-faint)', marginBottom: '4px' }}>File Size</div>
+                            <div style={{ color: 'var(--text-main)' }}>{exif.extended?.file_size || 'Unknown'}</div>
+                          </div>
+                          <div>
+                            <div style={{ color: 'var(--text-faint)', marginBottom: '4px' }}>Author / Creator</div>
+                            <div style={{ color: 'var(--text-main)' }}>{exif.extended?.author || 'Unknown'}</div>
+                          </div>
+                          <div>
+                            <div style={{ color: 'var(--text-faint)', marginBottom: '4px' }}>ISO</div>
+                            <div style={{ color: 'var(--text-main)' }}>{exif.extended?.iso || 'Unknown'}</div>
+                          </div>
+                          <div>
+                            <div style={{ color: 'var(--text-faint)', marginBottom: '4px' }}>Aperture</div>
+                            <div style={{ color: 'var(--text-main)' }}>{exif.extended?.aperture || 'Unknown'}</div>
+                          </div>
+                          <div>
+                            <div style={{ color: 'var(--text-faint)', marginBottom: '4px' }}>Shutter Speed</div>
+                            <div style={{ color: 'var(--text-main)' }}>{exif.extended?.shutter_speed || 'Unknown'}</div>
+                          </div>
+                          <div>
+                            <div style={{ color: 'var(--text-faint)', marginBottom: '4px' }}>Focal Length</div>
+                            <div style={{ color: 'var(--text-main)' }}>{exif.extended?.focal_length || 'Unknown'}</div>
+                          </div>
+                          <div style={{ gridColumn: '1 / -1' }}>
+                            <div style={{ color: 'var(--text-faint)', marginBottom: '4px' }}>Extracted GPS Coordinates</div>
+                            <div style={{ color: exif.extended?.coordinates !== 'None Detected' ? '#38bdf8' : 'var(--text-main)' }}>{exif.extended?.coordinates || 'None Detected'}</div>
+                          </div>
+                        </div>
+                      </div>
+
                     </div>
 
                     {/* Timeline Strip */}
