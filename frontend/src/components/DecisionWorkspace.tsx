@@ -160,9 +160,9 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
       <style>{dossierStyles}</style>
       
       {/* GLOBAL HEADER */}
-      <div style={{ flexShrink: 0, padding: '24px 48px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div className="mono" style={{ fontSize: '11px', letterSpacing: '0.15em', fontWeight: 500, color: 'var(--text-faint)' }}>VERITAS NEXUS / DOSSIER</div>
-        <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '11px', letterSpacing: '0.1em' }} className="mono hover-bright">CLOSE ✕</button>
+      <div style={{ flexShrink: 0, padding: '12px 48px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="mono" style={{ fontSize: '10px', letterSpacing: '0.15em', fontWeight: 500, color: 'var(--text-faint)' }}>VERITAS NEXUS / DOSSIER</div>
+        <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '10px', letterSpacing: '0.1em' }} className="mono hover-bright">CLOSE ✕</button>
       </div>
 
       {isEval ? (
@@ -171,50 +171,50 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
         <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
           
           {/* STABLE INVESTIGATION CONTEXT */}
-          <div style={{ flexShrink: 0, padding: '32px 48px', backgroundColor: 'rgba(255,255,255,0.01)', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexWrap: 'wrap', gap: '32px', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div style={{ flexShrink: 0, padding: '16px 48px 12px 48px', backgroundColor: 'rgba(255,255,255,0.01)', display: 'flex', flexWrap: 'wrap', gap: '20px', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ flex: 1, minWidth: '300px' }}>
-              <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '11px', letterSpacing: '0.1em', color: 'var(--text-faint)', marginBottom: '8px' }}>
+              <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '10px', letterSpacing: '0.1em', color: 'var(--text-faint)', marginBottom: '4px' }}>
                 <span style={{ color: `var(--c-${finalColorType})` }}>████</span> EVIDENCE ASSESSMENT
               </div>
-              <div style={{ fontSize: '32px', fontWeight: 800, color: `var(--c-${finalColorType})`, letterSpacing: '-0.02em', marginBottom: '16px' }}>
+              <div style={{ fontSize: '24px', fontWeight: 800, color: `var(--c-${finalColorType})`, letterSpacing: '-0.02em', marginBottom: '4px' }}>
                 {platformStatus === 'UNVERIFIED' ? 'UNVERIFIED' : assessment.verdict.toUpperCase()}
               </div>
-              <div style={{ fontSize: '14px', color: 'var(--text-main)', lineHeight: 1.5 }}>
+              <div style={{ fontSize: '13px', color: 'var(--text-main)' }}>
                 {evidence.ai_report?.disposition || 'Analysis complete. Refer to raw JSON for detailed execution trace.'}
               </div>
             </div>
             
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', minWidth: '200px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px', backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px' }}>
-                <div style={{ position: 'relative', width: '32px', height: '32px', borderRadius: '50%', border: '3px solid rgba(255,255,255,0.1)', borderTopColor: assessment.conf !== 'N/A' ? `var(--c-${finalColorType})` : 'rgba(255,255,255,0.1)' }}></div>
+            <div style={{ display: 'flex', flexDirection: 'column', minWidth: '200px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '10px 16px', backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px' }}>
+                <div style={{ position: 'relative', width: '28px', height: '28px', borderRadius: '50%', border: '3px solid rgba(255,255,255,0.1)', borderTopColor: assessment.conf !== 'N/A' ? `var(--c-${finalColorType})` : 'rgba(255,255,255,0.1)' }}></div>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <span className="mono" style={{ fontSize: '10px', color: 'var(--text-faint)', letterSpacing: '0.1em' }}>EVIDENCE INTEGRITY</span>
-                  <span style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-main)' }}>{assessment.conf !== 'N/A' ? `${assessment.conf}%` : 'N/A'}</span>
+                  <span className="mono" style={{ fontSize: '9px', color: 'var(--text-faint)', letterSpacing: '0.1em' }}>EVIDENCE INTEGRITY</span>
+                  <span style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-main)' }}>{assessment.conf !== 'N/A' ? `${assessment.conf}%` : 'N/A'}</span>
                 </div>
               </div>
             </div>
           </div>
 
           {/* EXECUTIVE EVIDENCE SUMMARY */}
-          <div style={{ padding: '0 48px 24px 48px', backgroundColor: 'rgba(255,255,255,0.01)' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px', padding: '16px', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', backgroundColor: '#0a0a0c' }}>
+          <div style={{ padding: '0 48px 16px 48px', backgroundColor: 'rgba(255,255,255,0.01)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', padding: '12px 16px', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', backgroundColor: '#0a0a0c' }}>
               
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px' }}>
                 {exif?.fingerprint.make !== 'Unknown' ? <Check size={14} color="#10b981" /> : <AlertTriangle size={14} color="#f59e0b" />}
                 <span style={{ color: 'var(--text-muted)' }}>Original hardware {exif?.fingerprint.make !== 'Unknown' ? `identified (${exif?.fingerprint.make})` : 'obscured'}</span>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px' }}>
                 {exif?.anomalies.likely_exported ? <AlertTriangle size={14} color="#f59e0b" /> : <Check size={14} color="#10b981" />}
                 <span style={{ color: 'var(--text-muted)' }}>Export signature {exif?.anomalies.likely_exported ? 'present' : 'clean'}</span>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px' }}>
                 {c2pa?.is_signed ? <Check size={14} color="#10b981" /> : <span style={{ color: '#ef4444' }}>✕</span>}
                 <span style={{ color: 'var(--text-muted)' }}>{c2pa?.is_signed ? 'Cryptographic provenance verified' : 'No C2PA provenance found'}</span>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px' }}>
                 {anomalyCount > 0 ? <span style={{ color: '#ef4444' }}>✕</span> : <Check size={14} color="#10b981" />}
                 <span style={{ color: 'var(--text-muted)' }}>{anomalyCount > 0 ? `High AI synthesis probability (${anomalyCount} regions)` : 'Low AI synthesis probability'}</span>
               </div>
@@ -223,7 +223,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
           </div>
 
           {/* TAB NAVIGATION */}
-          <div className="no-scrollbar mono" style={{ flexShrink: 0, display: 'flex', gap: '32px', padding: '0 48px', borderBottom: '1px solid rgba(255,255,255,0.05)', overflowX: 'auto' }}>
+          <div className="no-scrollbar mono" style={{ flexShrink: 0, display: 'flex', gap: '24px', padding: '0 48px', borderBottom: '1px solid rgba(255,255,255,0.05)', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
             {[
               { id: 'MEDIA', label: 'MEDIA VIEW' },
               { id: 'METADATA', label: 'METADATA' },
@@ -237,9 +237,18 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                 onClick={() => setMainTab(tab.id as any)} 
                 className="hover-bright" 
                 style={{ 
-                  background: 'transparent', border: 'none', padding: '16px 0', cursor: 'pointer', whiteSpace: 'nowrap', fontSize: '11px', letterSpacing: '0.1em',
+                  flexShrink: 0,
+                  background: 'transparent', 
+                  border: 'none', 
+                  padding: '16px 4px', 
+                  cursor: 'pointer', 
+                  whiteSpace: 'nowrap', 
+                  fontSize: '10px', 
+                  fontWeight: mainTab === tab.id ? 600 : 400,
+                  letterSpacing: '0.08em', 
                   color: mainTab === tab.id ? 'var(--text-main)' : 'var(--text-muted)',
-                  borderBottom: mainTab === tab.id ? '2px solid #3b82f6' : '2px solid transparent'
+                  borderBottom: mainTab === tab.id ? '2px solid #3b82f6' : '2px solid transparent',
+                  transition: 'color 0.2s, border-bottom-color 0.2s'
                 }}
               >
                 {tab.label}
