@@ -8,10 +8,11 @@ ENV PYTHONUNBUFFERED=1
 # Set the working directory
 WORKDIR /app
 
-# Install system dependencies (needed for psycopg2 and postgres connections)
+# Install system dependencies (needed for psycopg2, postgres connections, and forensic metadata)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
+    exiftool \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
