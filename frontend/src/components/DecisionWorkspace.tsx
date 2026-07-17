@@ -115,8 +115,10 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
     setTimeout(() => setCopiedInline(null), 2000);
   };
 
-  const regionsCount = typeof vitProb === 'number' && vitProb > 0.15 ? Math.max(1, Math.ceil(vitProb * 6)) : 0;
-  const syntheticText = typeof vitProb === 'number' && vitProb > 0.15 ? `${regionsCount} REGIONS` : '0 REGIONS';
+  // NEW ANOMALY LOGIC
+  const anomalyCount = typeof vitProb === 'number' ? Math.min(Math.floor(vitProb * 6), 5) : 0;
+  const anomalyText = anomalyCount > 0 ? `${anomalyCount} SUSPICIOUS AREA${anomalyCount > 1 ? 'S' : ''}` : 'NONE DETECTED';
+  const anomalyColor = anomalyCount > 0 ? 'var(--c-crit)' : 'var(--text-main)';
 
   const sameIssuer = caseEvidence.filter(e => e.id !== evidence.id && e.ai_report?.c2pa_data?.issuer === c2pa?.issuer && c2pa?.issuer && e.ai_report?.c2pa_data?.is_signed);
   const sameDay = caseEvidence.filter(e => e.id !== evidence.id && e.uploaded_at.split('T')[0] === evidence.uploaded_at.split('T')[0]);
@@ -241,9 +243,17 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                         <div style={{marginBottom: '4px'}}>INFERENCE CONFIDENCE</div>
                         <div style={{color: 'var(--text-main)', fontSize: '13px'}}>{typeof vitProb === 'number' ? ((1 - vitProb) * 100).toFixed(1) : '--'}%</div>
                       </div>
-                      <div>
-                        <div style={{marginBottom: '4px'}}>SYNTHETIC REGIONS</div>
-                        <div style={{color: typeof vitProb === 'number' && vitProb > 0.15 ? 'var(--c-warn)' : 'var(--text-main)', fontSize: '13px'}}>{syntheticText}</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div className="mono" style={{ fontSize: '10px', color: 'var(--text-faint)', letterSpacing: '0.1em' }}>
+                          DETECTED ANOMALIES
+                        </div>
+                        <div className="mono" style={{ fontSize: '13px', color: anomalyColor, fontWeight: 600 }}>
+                          {anomalyText}
+                        </div>
+                        {/* Micro-caption explains exactly what this means to the analyst */}
+                        <div style={{ fontSize: '9px', color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'none' }}>
+                          {anomalyCount > 0 ? 'Review heatmap for localization' : 'No localized threats found'}
+                        </div>
                       </div>
                     </div>
                   </div>
