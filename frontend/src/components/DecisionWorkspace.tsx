@@ -92,8 +92,6 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
   const [expandedCorrelation, setExpandedCorrelation] = useState<'ISSUER' | 'DAY' | null>(null);
 
   const [viewSession] = useState(Date.now());
-  
-  // NEW: Tracks unique retry tokens for failed visual layers
   const [imageTokens, setImageTokens] = useState<Record<string, number>>({});
 
   useEffect(() => {
@@ -192,7 +190,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
             ))}
           </div>
 
-          {/* TAB CONTENT AREA - Restored standard scrolling container */}
+          {/* TAB CONTENT AREA */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '32px 48px' }}>
             
             {mainTab === 'MEDIA' && (
@@ -222,10 +220,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                           key={tab} 
                           onClick={() => { 
                             setImageTab(tab as any); 
-                            // If tab was previously failed, instantly flag it as retryable to clear error state
-                            if (imageFailed) {
-                              setImageFailed(false);
-                            }
+                            if (imageFailed) setImageFailed(false);
                           }}
                           className="mono hover-bright"
                           style={{ flex: '1 0 auto', padding: '12px 16px', background: 'transparent', border: 'none', borderBottom: imageTab === tab ? '2px solid #3b82f6' : '2px solid transparent', color: imageTab === tab ? 'var(--text-main)' : 'var(--text-muted)', fontSize: '10px', letterSpacing: '0.1em', cursor: 'pointer', transition: 'all 0.2s' }}
@@ -233,8 +228,8 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                       ))}
                     </div>
 
-                    {/* RESTORED ORIGINAL 16:9 FIXED ASPECT RATIO */}
-                    <div style={{ width: '100%', aspectRatio: '16 / 9', backgroundColor: '#000', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                    {/* THE GOLDILOCKS FIX: Responsive height with a strict minimum of 450px */}
+                    <div style={{ width: '100%', height: '55vh', minHeight: '450px', backgroundColor: '#000', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                       {imageFailed ? (
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', zIndex: 10 }}>
                           <div className="mono" style={{ color: 'var(--c-crit)', fontSize: '11px', letterSpacing: '0.15em' }}>⚠ RENDER FAILED</div>
