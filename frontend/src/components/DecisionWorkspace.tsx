@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
-import { Share2, Disc, Edit2, Lock, ShieldCheck, Circle, Check, Copy, Link as LinkIcon, AlertTriangle, ChevronDown, ChevronRight, Maximize, ZoomIn, ZoomOut, Info } from 'lucide-react';
+import { Disc, Edit2, Lock, ShieldCheck, Circle, Check, Copy, Link as LinkIcon, AlertTriangle, ChevronDown, ChevronRight, Maximize, ZoomIn, ZoomOut, Info, Camera, Clock, FileMinus, MessageSquare } from 'lucide-react';
 import type { Evidence } from '../types';
 import { AssessmentEngine } from '../services/assessment';
 
@@ -61,6 +61,10 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
   const vitProb = evidence.ai_report?.deepfake_probability;
   const platformStatus = evidence.ai_report?.platform_status;
   
+  // Read EXIF from metadata dict
+  // @ts-ignore
+  const exif = evidence.metadata_dict?.exif;
+
   const isVitBypassed = vitProb === null;
   const isC2paBypassed = c2pa?.raw_status === "Bypassed by User";
   const isC2paBroken = c2pa?.status === "BROKEN_SIGNATURE";
@@ -78,7 +82,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
     ? c2pa.manifest_history 
     : [{ action: 'Origin', agent: 'Unknown Sensor/Software', timestamp: evidence.created_at || 'Unknown', description: 'Initial file creation' }];
 
-  const [mainTab, setMainTab] = useState<'MEDIA' | 'PROVENANCE' | 'CREDENTIAL' | 'CORRELATION' | 'RAW'>('MEDIA');
+  const [mainTab, setMainTab] = useState<'MEDIA' | 'METADATA' | 'PROVENANCE' | 'CREDENTIAL' | 'CORRELATION' | 'RAW'>('MEDIA');
   const [imageTab, setImageTab] = useState<'SOURCE' | 'HEATMAP' | 'PATCHES' | 'ATTENTION'>('SOURCE');
   
   const [imageFailed, setImageFailed] = useState(false);
@@ -170,6 +174,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
           <div className="no-scrollbar mono" style={{ flexShrink: 0, display: 'flex', gap: '32px', padding: '0 48px', borderBottom: '1px solid rgba(255,255,255,0.05)', overflowX: 'auto' }}>
             {[
               { id: 'MEDIA', label: 'MEDIA VIEW' },
+              { id: 'METADATA', label: 'METADATA' },
               { id: 'PROVENANCE', label: 'PROVENANCE GRAPH' },
               { id: 'CREDENTIAL', label: 'IDENTITY CREDENTIAL' },
               { id: 'CORRELATION', label: 'CORRELATIONS' },
@@ -228,7 +233,6 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                       ))}
                     </div>
 
-                    {/* THE GOLDILOCKS FIX: Responsive height with a strict minimum of 450px */}
                     <div style={{ width: '100%', height: '55vh', minHeight: '450px', backgroundColor: '#000', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                       {imageFailed ? (
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', zIndex: 10 }}>
@@ -279,6 +283,120 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                       </div>
                     </div>
                   </div>
+                )}
+              </div>
+            )}
+
+            {mainTab === 'METADATA' && (
+              <div style={{ maxWidth: '1000px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                {!exif ? (
+                   <div style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '8px' }}>
+                     <span className="mono" style={{ fontSize: '12px' }}>⚠ NO EXIF/METADATA PROFILE EXTRACTED.</span>
+                   </div>
+                ) : exif.status === 'FAILED' ? (
+                   <div style={{ padding: '48px', textAlign: 'center', color: 'var(--c-crit)', border: '1px solid rgba(220, 38, 38, 0.2)', backgroundColor: 'rgba(220, 38, 38, 0.05)', borderRadius: '8px' }}>
+                     <AlertTriangle size={32} style={{ margin: '0 auto 16px', opacity: 0.8 }} />
+                     <div className="mono" style={{ fontSize: '12px', fontWeight: 600 }}>METADATA EXTRACTION FAILED</div>
+                     <div style={{ fontSize: '12px', marginTop: '8px', color: 'var(--text-muted)' }}>{exif.error}</div>
+                   </div>
+                ) : (
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
+                      
+                      {/* Fingerprint Card */}
+                      <div style={{ backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '24px' }}>
+                        <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--text-faint)', letterSpacing: '0.1em', marginBottom: '16px' }}>
+                          <Camera size={14} /> HARDWARE / SOFTWARE FINGERPRINT
+                        </div>
+                        <div className="mono" style={{ display: 'grid', gridTemplateColumns: '100px 1fr', gap: '12px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                          <div>Make</div><div style={{ color: 'var(--text-main)' }}>{exif.fingerprint.make}</div>
+                          <div>Model</div><div style={{ color: 'var(--text-main)' }}>{exif.fingerprint.model}</div>
+                          <div>Software</div><div style={{ color: exif.fingerprint.software !== 'None Detected' ? '#38bdf8' : 'var(--text-main)' }}>{exif.fingerprint.software}</div>
+                          <div>Original Name</div><div style={{ color: 'var(--text-main)', wordBreak: 'break-all' }}>{exif.fingerprint.original_filename}</div>
+                        </div>
+                      </div>
+
+                      {/* Anomaly & Stripping Card */}
+                      <div style={{ backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '24px' }}>
+                        <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--text-faint)', letterSpacing: '0.1em', marginBottom: '16px' }}>
+                          <FileMinus size={14} /> FORENSIC FLAGS
+                        </div>
+                        <div className="mono" style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '11px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>Metadata Stripped</span>
+                            <span style={{ color: exif.anomalies.likely_stripped ? 'var(--c-crit)' : '#10b981', fontWeight: 600 }}>{exif.anomalies.likely_stripped ? 'YES (Suspect)' : 'NO'}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>Export Signatures</span>
+                            <span style={{ color: exif.anomalies.likely_exported ? 'var(--c-warn)' : '#10b981', fontWeight: 600 }}>{exif.anomalies.likely_exported ? 'YES (Modified)' : 'NO'}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>GPS Coordinates</span>
+                            <span style={{ color: exif.anomalies.gps_present ? '#38bdf8' : 'var(--text-faint)' }}>{exif.anomalies.gps_present ? 'PRESENT' : 'ABSENT'}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>Maker Notes (Raw)</span>
+                            <span style={{ color: exif.anomalies.makernotes_present ? '#38bdf8' : 'var(--text-faint)' }}>{exif.anomalies.makernotes_present ? 'PRESENT' : 'ABSENT'}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>Social Media Origin</span>
+                            <span style={{ color: exif.anomalies.social_media_origin ? 'var(--c-warn)' : '#10b981', fontWeight: 600 }}>{exif.anomalies.social_media_origin ? 'DETECTED' : 'NO'}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>USB Copy Artifacts</span>
+                            <span style={{ color: exif.anomalies.usb_copy_artifacts ? '#38bdf8' : 'var(--text-faint)' }}>{exif.anomalies.usb_copy_artifacts ? 'PRESENT' : 'ABSENT'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Timeline Strip */}
+                    <div style={{ backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '24px' }}>
+                      <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--text-faint)', letterSpacing: '0.1em', marginBottom: '20px' }}>
+                        <Clock size={14} /> EXIF TIMELINE RECONSTRUCTION
+                      </div>
+                      {Object.keys(exif.timeline).length === 0 ? (
+                        <div className="mono" style={{ fontSize: '11px', color: 'var(--text-muted)' }}>No EXIF timestamps extracted.</div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                          {Object.entries(exif.timeline).map(([key, value]) => (
+                            <div key={key} style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
+                              <div style={{ minWidth: '180px', flexShrink: 0 }}>
+                                <div className="mono" style={{ fontSize: '10px', color: 'var(--text-main)', padding: '4px 8px', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '4px', display: 'inline-block' }}>{key}</div>
+                              </div>
+                              <div className="mono" style={{ fontSize: '12px', color: 'var(--text-muted)', paddingTop: '3px' }}>{value as string}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Narrative Reconciliation */}
+                    <div style={{ backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '24px' }}>
+                       <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--text-faint)', letterSpacing: '0.1em', marginBottom: '16px' }}>
+                         <MessageSquare size={14} /> NARRATIVE RECONCILIATION
+                       </div>
+                       <textarea 
+                         placeholder="Enter subject's claim (e.g., 'I only took the pictures. I did not leak anything.')" 
+                         style={{ width: '100%', height: '80px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-main)', padding: '16px', borderRadius: '6px', fontFamily: 'monospace', fontSize: '12px', resize: 'none', marginBottom: '24px', outline: 'none' }}
+                       />
+                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                          <div style={{ borderLeft: '2px solid var(--c-crit)', paddingLeft: '16px' }}>
+                            <div className="mono" style={{ fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '0.05em' }}>CONTRADICTIONS</div>
+                            <div style={{ fontSize: '13px', color: 'var(--c-crit)', marginTop: '8px', lineHeight: 1.6 }}>
+                              {exif.anomalies.likely_exported ? '• Software signature implies post-processing (not just taken)' : '• None detected'}
+                              {exif.anomalies.likely_stripped ? <><br/>• Missing expected device metadata (Aggressive Scrub/Leak)</> : null}
+                            </div>
+                          </div>
+                          <div style={{ borderLeft: '2px solid #10b981', paddingLeft: '16px' }}>
+                            <div className="mono" style={{ fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '0.05em' }}>SUPPORTING FACTS</div>
+                            <div style={{ fontSize: '13px', color: '#10b981', marginTop: '8px', lineHeight: 1.6 }}>
+                              {exif.fingerprint.make !== 'Unknown' ? `• Origin hardware verified (${exif.fingerprint.make})` : '• None detected'}
+                            </div>
+                          </div>
+                       </div>
+                    </div>
+                  </>
                 )}
               </div>
             )}
