@@ -247,3 +247,27 @@ async def get_patches(evidence_id: uuid.UUID, db: AsyncSession = Depends(get_db)
 async def get_attention(evidence_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     """Serves the raw neural attention map."""
     return await _proxy_visual(evidence_id, "attention", db)
+
+
+@router.delete("/{evidence_id}", tags=["Evidence"])
+async def delete_evidence(evidence_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    """Deletes evidence record and associated physical file."""
+    try:
+        # 1. Locate the physical file path
+        stmt = text("SELECT storage_uri FROM core.evidence WHERE id = :id")
+        result = await db.execute(stmt, {"id": str(evidence_id)})
+        record = result.fetchone()
+
+        if record:
+            file_path = Path(record.storage_uri)
+            if file_path.exists():
+                os.remove(file_path)
+
+        # 2. Delete the database record
+        await db.execute(text("DELETE FROM core.evidence WHERE id = :id"), {"id": str(evidence_id)})
+        await db.commit()
+        
+        return {"status": "success", "message": "Evidence deleted."}
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Delete failed: {str(e)}")
