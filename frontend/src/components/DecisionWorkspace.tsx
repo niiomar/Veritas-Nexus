@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { Share2, Disc, Edit2, Lock, ShieldCheck, Circle, Check, Copy, Link as LinkIcon, AlertTriangle, ChevronDown, ChevronRight, Maximize, ZoomIn, ZoomOut, Info } from 'lucide-react';
 import type { Evidence } from '../types';
 import { AssessmentEngine } from '../services/assessment';
@@ -91,17 +91,23 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
   const [zoom, setZoom] = useState(1);
   const [expandedCorrelation, setExpandedCorrelation] = useState<'ISSUER' | 'DAY' | null>(null);
 
+  const [viewSession] = useState(Date.now());
+  
+  // NEW: Tracks unique retry tokens for failed visual layers
+  const [imageTokens, setImageTokens] = useState<Record<string, number>>({});
+
   useEffect(() => {
     setZoom(1);
   }, [evidence.id, imageTab]);
 
-  const getImageUrl = (tab: string) => {
-    const cacheBuster = `?t=${new Date().getTime()}`;
-    if (tab === 'HEATMAP') return `${API_BASE_URL}/api/v1/evidence/${evidence.id}/heatmap${cacheBuster}`;
-    if (tab === 'PATCHES') return `${API_BASE_URL}/api/v1/evidence/${evidence.id}/patches${cacheBuster}`;
-    if (tab === 'ATTENTION') return `${API_BASE_URL}/api/v1/evidence/${evidence.id}/attention${cacheBuster}`;
-    return `${API_BASE_URL}/api/v1/evidence/${evidence.id}/download${cacheBuster}`; 
-  };
+  const getImageUrl = useCallback((tab: string) => {
+    const token = imageTokens[tab] || viewSession;
+    const qs = `?v=${token}`;
+    if (tab === 'HEATMAP') return `${API_BASE_URL}/api/v1/evidence/${evidence.id}/heatmap${qs}`;
+    if (tab === 'PATCHES') return `${API_BASE_URL}/api/v1/evidence/${evidence.id}/patches${qs}`;
+    if (tab === 'ATTENTION') return `${API_BASE_URL}/api/v1/evidence/${evidence.id}/attention${qs}`;
+    return `${API_BASE_URL}/api/v1/evidence/${evidence.id}/download${qs}`; 
+  }, [evidence.id, viewSession, imageTokens]);
 
   const handleCopy = (type: 'C2PA' | 'VIT', data: any) => {
     navigator.clipboard.writeText(JSON.stringify(data, null, 2));
@@ -126,8 +132,8 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
     <div className="decision-workspace" style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', backgroundColor: '#050505', position: 'relative' }}>
       <style>{dossierStyles}</style>
       
-      {/* GLOBAL HEADER - TIGHTENED PADDING */}
-      <div style={{ flexShrink: 0, padding: '16px 48px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      {/* GLOBAL HEADER */}
+      <div style={{ flexShrink: 0, padding: '24px 48px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div className="mono" style={{ fontSize: '11px', letterSpacing: '0.15em', fontWeight: 500, color: 'var(--text-faint)' }}>VERITAS NEXUS / DOSSIER</div>
         <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '11px', letterSpacing: '0.1em' }} className="mono hover-bright">CLOSE ✕</button>
       </div>
@@ -137,13 +143,13 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
       ) : (
         <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
           
-          {/* STABLE INVESTIGATION CONTEXT - TIGHTENED PADDING */}
-          <div style={{ flexShrink: 0, padding: '20px 48px', backgroundColor: 'rgba(255,255,255,0.01)', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexWrap: 'wrap', gap: '32px', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          {/* STABLE INVESTIGATION CONTEXT */}
+          <div style={{ flexShrink: 0, padding: '32px 48px', backgroundColor: 'rgba(255,255,255,0.01)', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexWrap: 'wrap', gap: '32px', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div style={{ flex: 1, minWidth: '300px' }}>
               <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '11px', letterSpacing: '0.1em', color: 'var(--text-faint)', marginBottom: '8px' }}>
                 <span style={{ color: `var(--c-${finalColorType})` }}>████</span> EVIDENCE ASSESSMENT
               </div>
-              <div style={{ fontSize: '32px', fontWeight: 800, color: `var(--c-${finalColorType})`, letterSpacing: '-0.02em', marginBottom: '12px' }}>
+              <div style={{ fontSize: '32px', fontWeight: 800, color: `var(--c-${finalColorType})`, letterSpacing: '-0.02em', marginBottom: '16px' }}>
                 {platformStatus === 'UNVERIFIED' ? 'UNVERIFIED' : assessment.verdict.toUpperCase()}
               </div>
               <div style={{ fontSize: '14px', color: 'var(--text-main)', lineHeight: 1.5 }}>
@@ -162,7 +168,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
             </div>
           </div>
 
-          {/* TAB NAVIGATION - TIGHTENED PADDING */}
+          {/* TAB NAVIGATION */}
           <div className="no-scrollbar mono" style={{ flexShrink: 0, display: 'flex', gap: '32px', padding: '0 48px', borderBottom: '1px solid rgba(255,255,255,0.05)', overflowX: 'auto' }}>
             {[
               { id: 'MEDIA', label: 'MEDIA VIEW' },
@@ -176,7 +182,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                 onClick={() => setMainTab(tab.id as any)} 
                 className="hover-bright" 
                 style={{ 
-                  background: 'transparent', border: 'none', padding: '12px 0', cursor: 'pointer', whiteSpace: 'nowrap', fontSize: '11px', letterSpacing: '0.1em',
+                  background: 'transparent', border: 'none', padding: '16px 0', cursor: 'pointer', whiteSpace: 'nowrap', fontSize: '11px', letterSpacing: '0.1em',
                   color: mainTab === tab.id ? 'var(--text-main)' : 'var(--text-muted)',
                   borderBottom: mainTab === tab.id ? '2px solid #3b82f6' : '2px solid transparent'
                 }}
@@ -186,8 +192,8 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
             ))}
           </div>
 
-          {/* TAB CONTENT AREA - TIGHTENED PADDING */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '24px 48px' }}>
+          {/* TAB CONTENT AREA - Restored standard scrolling container */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '32px 48px' }}>
             
             {mainTab === 'MEDIA' && (
               <div style={{ display: 'flex', flexDirection: 'column', width: '100%', maxWidth: '1000px', margin: '0 auto', gap: '24px' }}>
@@ -213,17 +219,39 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                     <div className="no-scrollbar" style={{ display: 'flex', overflowX: 'auto', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                       {['SOURCE', 'HEATMAP', 'PATCHES', 'ATTENTION'].map((tab) => (
                         <button 
-                          key={tab} onClick={() => { setImageTab(tab as any); setImageFailed(false); }}
+                          key={tab} 
+                          onClick={() => { 
+                            setImageTab(tab as any); 
+                            // If tab was previously failed, instantly flag it as retryable to clear error state
+                            if (imageFailed) {
+                              setImageFailed(false);
+                            }
+                          }}
                           className="mono hover-bright"
                           style={{ flex: '1 0 auto', padding: '12px 16px', background: 'transparent', border: 'none', borderBottom: imageTab === tab ? '2px solid #3b82f6' : '2px solid transparent', color: imageTab === tab ? 'var(--text-main)' : 'var(--text-muted)', fontSize: '10px', letterSpacing: '0.1em', cursor: 'pointer', transition: 'all 0.2s' }}
                         >{tab}</button>
                       ))}
                     </div>
 
-                    {/* DYNAMIC VIEWPORT CLAMP - REPLACES FIXED 16:9 ASPECT RATIO */}
-                    <div style={{ width: '100%', height: 'clamp(300px, 40vh, 480px)', backgroundColor: '#000', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                    {/* RESTORED ORIGINAL 16:9 FIXED ASPECT RATIO */}
+                    <div style={{ width: '100%', aspectRatio: '16 / 9', backgroundColor: '#000', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                       {imageFailed ? (
-                        <div className="mono" style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px', letterSpacing: '0.1em' }}>{imageTab} UNAVAILABLE</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', zIndex: 10 }}>
+                          <div className="mono" style={{ color: 'var(--c-crit)', fontSize: '11px', letterSpacing: '0.15em' }}>⚠ RENDER FAILED</div>
+                          <div style={{ color: 'var(--text-muted)', fontSize: '11px', textAlign: 'center', maxWidth: '300px' }}>
+                            The neural engine timed out or the browser cached a broken connection state.
+                          </div>
+                          <button 
+                            onClick={() => {
+                              setImageFailed(false);
+                              setImageTokens(prev => ({ ...prev, [imageTab]: Date.now() }));
+                            }}
+                            className="mono hover-bright"
+                            style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: 'var(--text-main)', padding: '6px 16px', fontSize: '10px', letterSpacing: '0.1em', cursor: 'pointer', borderRadius: '4px' }}
+                          >
+                            FORCE RETRY
+                          </button>
+                        </div>
                       ) : (
                         <div style={{ transform: `scale(${zoom})`, transformOrigin: 'center center', transition: 'transform 0.2s ease', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           <img src={getImageUrl(imageTab)} alt={`Forensic ${imageTab}`} className="animate-fade-in" style={{ width: '100%', height: '100%', objectFit: 'contain' }} onError={() => setImageFailed(true)} onLoad={() => setImageFailed(false)} />
