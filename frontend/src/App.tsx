@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Trash2 } from 'lucide-react';
 
 import './index.css';
 import type { Case, Evidence, EngineStatus } from './types';
@@ -144,6 +144,31 @@ export default function App() {
       setCaseToDelete(null); 
     } catch (err: any) {
       setUploadError(`Case Deletion Failed: ${err.message}`);
+      setTimeout(() => setUploadError(null), 5000);
+    }
+  };
+
+  const handleDeleteEvidence = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation(); // Prevents the click from opening the dossier view
+    if (!window.confirm("Are you sure you want to permanently delete this evidence?")) return;
+    
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/v1/evidence/${id}`, {
+        method: 'DELETE'
+      });
+      
+      if (response.ok) {
+        // If the deleted file is currently open in the dossier, close it
+        if (selectedEvidence?.id === id) {
+          setSelectedEvidence(null);
+        }
+        syncDatabase(); // Instantly refresh the ledger UI
+      } else {
+        setUploadError(`Failed to delete evidence.`);
+        setTimeout(() => setUploadError(null), 5000);
+      }
+    } catch (err: any) {
+      setUploadError(`Network error: ${err.message}`);
       setTimeout(() => setUploadError(null), 5000);
     }
   };
@@ -318,7 +343,6 @@ export default function App() {
                             finalColorType = 'trust';
                           }
 
-                        
                           return (
                             <div key={item.id} role="button" tabIndex={0} onClick={() => setSelectedEvidence(item)}
                                  style={{ 
@@ -346,7 +370,7 @@ export default function App() {
                                 )}
                               </div>
 
-                              <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0, paddingLeft: '8px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0, paddingLeft: '8px', gap: '16px' }}>
                                 {isEval ? (
                                   <div className="mono animate-pulse" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: 'var(--text-muted)', fontWeight: 600 }}>
                                     <span style={{ fontSize: '10px' }}>●</span> EVALUATING
@@ -356,6 +380,26 @@ export default function App() {
                                     <span style={{ color: `var(--c-${finalColorType})`, fontSize: '10px' }}>●</span> {ast.conf === 'N/A' ? 'N/A' : `${ast.conf}%`}
                                   </div>
                                 )}
+
+                                {/* EVIDENCE DELETE BUTTON */}
+                                <button 
+                                  onClick={(e) => handleDeleteEvidence(e, item.id)}
+                                  className="hover-bright"
+                                  title="Delete Evidence"
+                                  style={{ 
+                                    background: 'transparent', 
+                                    border: 'none', 
+                                    color: 'var(--c-crit)', 
+                                    cursor: 'pointer', 
+                                    padding: '4px', 
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    opacity: isActive ? 1 : 0.4,
+                                    transition: 'opacity 0.2s'
+                                  }}
+                                >
+                                  <Trash2 size={14} />
+                                </button>
                               </div>
                             </div>
                           );
@@ -368,7 +412,6 @@ export default function App() {
             )}
           </main>
 
-          
           {/* RIGHT: DOSSIER */}
           {selectedEvidence && activeCase && (
             <div style={{ flex: 1, overflow: 'hidden', display: 'flex', backgroundColor: '#050505', borderLeft: '1px solid rgba(255,255,255,0.05)' }}>
@@ -376,7 +419,6 @@ export default function App() {
             </div>
           )}
         </div>
-
         
         {/* OPERATIONS CENTER TELEMETRY FOOTER */}
         <div className="mono" style={{ height: '40px', background: 'var(--bg-base)', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px', flexShrink: 0, zIndex: 10, fontSize: '10px', color: 'var(--text-faint)', letterSpacing: '0.1em' }}>
