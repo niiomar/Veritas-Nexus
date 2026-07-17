@@ -18,6 +18,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.dependencies import get_db_session as get_db
 from infrastructure.persistence.models import EvidenceORM, AnalysisJobORM, AuditEventORM
 
+# Import the new EXIF Engine
+from api.services.exif_core import ExifCoreEngine
+
 # Setup logging
 logger = logging.getLogger("EvidenceRouter")
 
@@ -34,8 +37,8 @@ async def ingest_evidence(
     case_id: uuid.UUID = Form(...),
     uploaded_by: str = Form(...),
     file: UploadFile = File(...),
-    use_vit: bool = Form(True),    # ViT toggle
-    use_c2pa: bool = Form(True),   # C2PA toggle
+    use_vit: bool = Form(True),    
+    use_c2pa: bool = Form(True),   
     db: AsyncSession = Depends(get_db)
 ):
     try:
@@ -55,6 +58,9 @@ async def ingest_evidence(
                 sha256_hash.update(byte_block)
         file_hash = sha256_hash.hexdigest()
 
+        # RUN METADATA EXTRACTION IMMEDIATELY ON INGEST
+        exif_data = ExifCoreEngine.extract_metadata(str(file_path))
+
         now = datetime.now(timezone.utc)
         
         evidence_record = EvidenceORM(
@@ -66,11 +72,11 @@ async def ingest_evidence(
             storage_uri=str(file_path),
             uploaded_by=uploaded_by,
             uploaded_at=now,
-            # Saved the toggles to the DB so the worker knows what to execute
             metadata_dict={
                 "content_type": file.content_type,
                 "use_vit": use_vit,
-                "use_c2pa": use_c2pa
+                "use_c2pa": use_c2pa,
+                "exif": exif_data  # Storing the EXIF profile
             }
         )
         db.add(evidence_record)
@@ -110,8 +116,9 @@ async def ingest_evidence(
 @router.get("/")
 async def list_evidence(db: AsyncSession = Depends(get_db)):
     try:
+        # ADDED: e.metadata_dict to the SQL SELECT query
         stmt = text("""
-            SELECT e.id, e.case_id, e.original_filename, e.sha256, e.uploaded_at, j.status, j.ai_report
+            SELECT e.id, e.case_id, e.original_filename, e.sha256, e.uploaded_at, e.metadata_dict, j.status, j.ai_report
             FROM core.evidence e
             JOIN analysis.analysis_jobs j ON e.id = j.evidence_id
             ORDER BY e.uploaded_at DESC
@@ -132,7 +139,8 @@ async def list_evidence(db: AsyncSession = Depends(get_db)):
                 "sha256": row["sha256"],
                 "status": row["status"],
                 "uploaded_at": row["uploaded_at"].isoformat(),
-                "ai_report": report
+                "ai_report": report,
+                "metadata_dict": row.get("metadata_dict", {}) # Append EXIF to payload
             })
 
         return {"evidence": evidence_list}
@@ -178,8 +186,6 @@ def fetch_visual_from_microservice(file_path: str, visual_type: str) -> bytes:
             raise RuntimeError(f"ViT-CORE rejected request: HTTP {response.status_code} - {response.text}")
         
         data = response.json()
-        
-        # Unpack the new dictionary array returned by the updated model.py
         maps = data.get("explainability_maps", [])
         raw_b64 = None
         
@@ -188,14 +194,13 @@ def fetch_visual_from_microservice(file_path: str, visual_type: str) -> bytes:
             if isinstance(frame_visuals, dict):
                 raw_b64 = frame_visuals.get(visual_type)
             elif isinstance(frame_visuals, str):
-                raw_b64 = frame_visuals  # Fallback for old single-string format
+                raw_b64 = frame_visuals 
         elif isinstance(maps, dict):
             raw_b64 = maps.get(visual_type)
             
         if not raw_b64 or not isinstance(raw_b64, str):
             raise RuntimeError(f"ViT-CORE returned missing or invalid '{visual_type}' data.")
             
-        # Strip potential data URI padding
         raw_b64 = raw_b64.replace("data:image/jpeg;base64,", "").replace("data:image/png;base64,", "")
         return base64.b64decode(raw_b64)
         
@@ -219,7 +224,6 @@ async def _proxy_visual(evidence_id: uuid.UUID, visual_type: str, db: AsyncSessi
         if not record or not Path(record.storage_uri).exists():
             raise HTTPException(status_code=404, detail="Source image not found")
 
-        # Offload the heavy network request to a separate thread to keep FastAPI fast
         image_bytes = await asyncio.to_thread(fetch_visual_from_microservice, str(record.storage_uri), visual_type)
         return Response(content=image_bytes, media_type="image/jpeg")
 
@@ -233,19 +237,16 @@ async def _proxy_visual(evidence_id: uuid.UUID, visual_type: str, db: AsyncSessi
 
 @router.get("/{evidence_id}/heatmap", tags=["Evidence", "ViT-CORE"])
 async def get_heatmap(evidence_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
-    """Serves the blended thermal map."""
     return await _proxy_visual(evidence_id, "heatmap", db)
 
 
 @router.get("/{evidence_id}/patches", tags=["Evidence", "ViT-CORE"])
 async def get_patches(evidence_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
-    """Serves the 16x16 geometry grid."""
     return await _proxy_visual(evidence_id, "patches", db)
 
 
 @router.get("/{evidence_id}/attention", tags=["Evidence", "ViT-CORE"])
 async def get_attention(evidence_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
-    """Serves the raw neural attention map."""
     return await _proxy_visual(evidence_id, "attention", db)
 
 
@@ -253,7 +254,6 @@ async def get_attention(evidence_id: uuid.UUID, db: AsyncSession = Depends(get_d
 async def delete_evidence(evidence_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     """Deletes evidence record, child dependencies, and the physical file."""
     try:
-        # 1. Locate the physical file path
         stmt = text("SELECT storage_uri FROM core.evidence WHERE id = :id")
         result = await db.execute(stmt, {"id": str(evidence_id)})
         record = result.fetchone()
@@ -266,12 +266,8 @@ async def delete_evidence(evidence_id: uuid.UUID, db: AsyncSession = Depends(get
                 except OSError as e:
                     logger.warning(f"Could not remove physical file {file_path}: {e}")
 
-        # 2. CLEAR DEPENDENCIES: Delete child records to prevent PostgreSQL Integrity Errors
         await db.execute(text("DELETE FROM analysis.analysis_jobs WHERE evidence_id = :id"), {"id": str(evidence_id)})
-        
-        # 3. Delete the parent evidence record
         await db.execute(text("DELETE FROM core.evidence WHERE id = :id"), {"id": str(evidence_id)})
-        
         await db.commit()
         
         return {"status": "success", "message": "Evidence completely purged."}
