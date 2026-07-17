@@ -31,7 +31,6 @@ export default function App() {
   const [caseToEdit, setCaseToEdit] = useState<Case | null>(null);
   const [caseToDelete, setCaseToDelete] = useState<Case | null>(null);
   
-  // NEW STATE: Tracks which evidence item the user wants to delete
   const [evidenceToDelete, setEvidenceToDelete] = useState<Evidence | null>(null);
   
   const [engineStatus, setEngineStatus] = useState<EngineStatus>({ vit: 'ONLINE', c2pa: 'ONLINE' });
@@ -151,7 +150,6 @@ export default function App() {
     }
   };
 
-  // REFACTORED: Actual API call executed from the custom modal
   const confirmDeleteEvidence = async () => {
     if (!evidenceToDelete) return;
     
@@ -173,7 +171,6 @@ export default function App() {
       setUploadError(`Network error: ${err.message}`);
       setTimeout(() => setUploadError(null), 5000);
     } finally {
-      // Close the modal regardless of outcome
       setEvidenceToDelete(null);
     }
   };
@@ -181,7 +178,6 @@ export default function App() {
   const filteredEvidence = activeCase ? evidenceLibrary.filter(item => item.case_id === activeCase.id) : [];
   const activeQueueCount = filteredEvidence.filter(item => item.status !== 'COMPLETED' || !item.ai_report).length;
 
-  // ROBUST DYNAMIC COLOR LOGIC
   let priorityColor = 'var(--text-muted)';
   const pText = activeCase?.priority?.toLowerCase() || '';
   if (pText.includes('crit')) priorityColor = 'var(--c-crit)';
@@ -193,7 +189,6 @@ export default function App() {
     <>
       {uploadError && <div className="toast"><AlertCircle size={16} /> {uploadError}</div>}
 
-      {/* HIGH-PRIORITY MODAL LAYER */}
       <div style={{ position: 'relative', zIndex: 999 }}>
         {isCreateModalOpen && (
           <CreateCaseModal onClose={() => setIsCreateModalOpen(false)} onSubmit={handleCreateCase} />
@@ -207,7 +202,6 @@ export default function App() {
           <DeleteCaseModal caseToDelete={caseToDelete} onClose={() => setCaseToDelete(null)} onConfirm={confirmDeleteCase} />
         )}
 
-        {/* NEW CUSTOM EVIDENCE DELETION MODAL */}
         {evidenceToDelete && (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(5, 5, 5, 0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }}>
             <div style={{ background: '#0a0a0a', border: '1px solid rgba(220, 38, 38, 0.4)', borderRadius: '6px', padding: '24px', width: '420px', maxWidth: '90%', display: 'flex', flexDirection: 'column', gap: '20px', boxShadow: '0 16px 40px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(220, 38, 38, 0.1)' }}>
@@ -289,7 +283,6 @@ export default function App() {
               <>
                 <div style={{ display: 'flex', flexDirection: selectedEvidence ? 'column' : 'row', justifyContent: 'space-between', alignItems: selectedEvidence ? 'flex-start' : 'center', gap: '24px', marginBottom: '24px', flexShrink: 0 }}>
                   
-                  {/* REDESIGNED CASE HEADER */}
                   <div style={{ minWidth: 0, width: '100%' }}>
                     <div className="mono" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px', marginBottom: '16px', fontSize: '10px', letterSpacing: '0.15em' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.03)', padding: '6px 12px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.05)' }}>
@@ -376,13 +369,14 @@ export default function App() {
                           const platformStatus = item.ai_report?.platform_status;
                           const c2paStatus = item.ai_report?.c2pa_data?.status;
                           
-                          let finalColorType = ast.type;
-                          if (ast.type === 'crit' || platformStatus === 'CRITICAL THREAT' || c2paStatus === 'BROKEN_SIGNATURE') {
-                            finalColorType = 'crit';
-                          } else if (platformStatus === 'UNVERIFIED' || ast.type === 'review' || ast.type === 'neutral' || ast.verdict === 'UNKNOWN') {
-                            finalColorType = 'review';
-                          } else {
-                            finalColorType = 'trust';
+                          // NEW 4-TIER COLOR MAPPING TO SYNC WITH SIDEBAR
+                          let statusHex = '#94a3b8'; // Default Unverified Gray
+                          if (ast.verdict === 'CRITICAL' || platformStatus === 'CRITICAL THREAT' || c2paStatus === 'BROKEN_SIGNATURE') {
+                            statusHex = '#ef4444'; // Red
+                          } else if (ast.verdict === 'CONFLICT' || platformStatus === 'CONFLICT') {
+                            statusHex = '#f59e0b'; // Amber/Orange
+                          } else if (ast.verdict === 'TRUSTED') {
+                            statusHex = '#10b981'; // Green
                           }
 
                           return (
@@ -419,11 +413,10 @@ export default function App() {
                                   </div>
                                 ) : (
                                   <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-main)', fontWeight: 600 }}>
-                                    <span style={{ color: `var(--c-${finalColorType})`, fontSize: '10px' }}>●</span> {ast.conf === 'N/A' ? 'N/A' : `${ast.conf}%`}
+                                    <span style={{ color: statusHex, fontSize: '10px' }}>●</span> {ast.conf === 'N/A' ? 'N/A' : `${ast.conf}%`}
                                   </div>
                                 )}
 
-                                {/* REFACTORED: Opens custom modal instead of window.confirm */}
                                 <button 
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -457,7 +450,6 @@ export default function App() {
             )}
           </main>
 
-          {/* RIGHT: DOSSIER */}
           {selectedEvidence && activeCase && (
             <div style={{ flex: 1, overflow: 'hidden', display: 'flex', backgroundColor: '#050505', borderLeft: '1px solid rgba(255,255,255,0.05)' }}>
                <DecisionWorkspace evidence={selectedEvidence} caseEvidence={filteredEvidence} onClose={() => setSelectedEvidence(null)} />
@@ -465,7 +457,6 @@ export default function App() {
           )}
         </div>
         
-        {/* OPERATIONS CENTER TELEMETRY FOOTER */}
         <div className="mono" style={{ height: '40px', background: 'var(--bg-base)', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px', flexShrink: 0, zIndex: 10, fontSize: '10px', color: 'var(--text-faint)', letterSpacing: '0.1em' }}>
           <div style={{ display: 'flex', gap: '48px' }}>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
