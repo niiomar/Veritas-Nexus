@@ -31,6 +31,9 @@ export default function App() {
   const [caseToEdit, setCaseToEdit] = useState<Case | null>(null);
   const [caseToDelete, setCaseToDelete] = useState<Case | null>(null);
   
+  // NEW STATE: Tracks which evidence item the user wants to delete
+  const [evidenceToDelete, setEvidenceToDelete] = useState<Evidence | null>(null);
+  
   const [engineStatus, setEngineStatus] = useState<EngineStatus>({ vit: 'ONLINE', c2pa: 'ONLINE' });
   const [lastSync, setLastSync] = useState<string>('00:00');
 
@@ -148,21 +151,20 @@ export default function App() {
     }
   };
 
-  const handleDeleteEvidence = async (e: React.MouseEvent, id: string) => {
-    e.stopPropagation(); // Prevents the click from opening the dossier view
-    if (!window.confirm("Are you sure you want to permanently delete this evidence?")) return;
+  // REFACTORED: Actual API call executed from the custom modal
+  const confirmDeleteEvidence = async () => {
+    if (!evidenceToDelete) return;
     
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/v1/evidence/${id}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/v1/evidence/${evidenceToDelete.id}`, {
         method: 'DELETE'
       });
       
       if (response.ok) {
-        // If the deleted file is currently open in the dossier, close it
-        if (selectedEvidence?.id === id) {
+        if (selectedEvidence?.id === evidenceToDelete.id) {
           setSelectedEvidence(null);
         }
-        syncDatabase(); // Instantly refresh the ledger UI
+        syncDatabase(); 
       } else {
         setUploadError(`Failed to delete evidence.`);
         setTimeout(() => setUploadError(null), 5000);
@@ -170,6 +172,9 @@ export default function App() {
     } catch (err: any) {
       setUploadError(`Network error: ${err.message}`);
       setTimeout(() => setUploadError(null), 5000);
+    } finally {
+      // Close the modal regardless of outcome
+      setEvidenceToDelete(null);
     }
   };
 
@@ -200,6 +205,43 @@ export default function App() {
 
         {caseToDelete && (
           <DeleteCaseModal caseToDelete={caseToDelete} onClose={() => setCaseToDelete(null)} onConfirm={confirmDeleteCase} />
+        )}
+
+        {/* NEW CUSTOM EVIDENCE DELETION MODAL */}
+        {evidenceToDelete && (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(5, 5, 5, 0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }}>
+            <div style={{ background: '#0a0a0a', border: '1px solid rgba(220, 38, 38, 0.4)', borderRadius: '6px', padding: '24px', width: '420px', maxWidth: '90%', display: 'flex', flexDirection: 'column', gap: '20px', boxShadow: '0 16px 40px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(220, 38, 38, 0.1)' }}>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--c-crit)', borderBottom: '1px solid rgba(220, 38, 38, 0.2)', paddingBottom: '12px' }}>
+                <AlertCircle size={20} />
+                <h2 className="mono" style={{ margin: 0, fontSize: '13px', letterSpacing: '0.15em', fontWeight: 600 }}>CONFIRM DELETION</h2>
+              </div>
+              
+              <div style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.6' }}>
+                Are you sure you want to purge the asset <strong style={{ color: 'var(--text-main)', fontWeight: 600 }}>{evidenceToDelete.filename.split('_').slice(1).join('_') || evidenceToDelete.filename}</strong>? 
+                <br /><br />
+                This action is irreversible and will permanently erase the item from the ledger and secure vault.
+              </div>
+              
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '4px' }}>
+                <button 
+                  onClick={() => setEvidenceToDelete(null)}
+                  className="hover-bright mono"
+                  style={{ padding: '8px 20px', background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: 'var(--text-main)', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', fontWeight: 600, letterSpacing: '0.1em' }}
+                >
+                  CANCEL
+                </button>
+                <button 
+                  onClick={confirmDeleteEvidence}
+                  className="hover-bright mono"
+                  style={{ padding: '8px 20px', background: 'rgba(220, 38, 38, 0.15)', border: '1px solid var(--c-crit)', color: 'var(--c-crit)', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', fontWeight: 600, letterSpacing: '0.1em' }}
+                >
+                  PURGE EVIDENCE
+                </button>
+              </div>
+
+            </div>
+          </div>
         )}
 
         {isUploading && file && activeCase && (
@@ -381,9 +423,12 @@ export default function App() {
                                   </div>
                                 )}
 
-                                {/* EVIDENCE DELETE BUTTON */}
+                                {/* REFACTORED: Opens custom modal instead of window.confirm */}
                                 <button 
-                                  onClick={(e) => handleDeleteEvidence(e, item.id)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEvidenceToDelete(item);
+                                  }}
                                   className="hover-bright"
                                   title="Delete Evidence"
                                   style={{ 
