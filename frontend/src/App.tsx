@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { AlertCircle, Trash2, MessageSquare } from 'lucide-react';
+import { AlertCircle, Trash2 } from 'lucide-react';
 
 import './index.css';
 import type { Case, Evidence, EngineStatus } from './types';
@@ -162,8 +162,6 @@ export default function App() {
         if (selectedEvidence?.id === evidenceToDelete.id) {
           setSelectedEvidence(null);
         }
-        // Cleanup local storage narrative cache if it exists
-        localStorage.removeItem(`nexus_narrative_${evidenceToDelete.id}`);
         syncDatabase(); 
       } else {
         setUploadError(`Failed to delete evidence.`);
@@ -370,17 +368,13 @@ export default function App() {
 
                           const platformStatus = item.ai_report?.platform_status;
                           const c2paStatus = item.ai_report?.c2pa_data?.status;
-                          
-                          // Check if a narrative has been added
-                          // @ts-ignore
-                          const hasNarrative = !!localStorage.getItem(`nexus_narrative_${item.id}`) || !!item.metadata_dict?.narrative_claim;
 
                           let statusHex = '#94a3b8'; // Default Unverified Gray
                           if (ast.verdict === 'CRITICAL' || platformStatus === 'CRITICAL THREAT' || c2paStatus === 'BROKEN_SIGNATURE') {
                             statusHex = '#ef4444'; // Red
                           } else if (ast.verdict === 'CONFLICT' || platformStatus === 'CONFLICT') {
                             statusHex = '#f59e0b'; // Amber/Orange
-                          } else if (ast.verdict === 'TRUSTED') {
+                          } else if (ast.verdict === 'TRUSTED' || ast.verdict === 'VERIFIED') {
                             statusHex = '#10b981'; // Green
                           }
 
@@ -397,11 +391,8 @@ export default function App() {
                                  className="hover-bright">
                               
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600, fontSize: '13px', color: isActive ? 'var(--text-main)' : 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                  <span>● {cleanName}</span>
-                                  {hasNarrative && (
-                                    <MessageSquare size={12} color="#38bdf8" style={{ flexShrink: 0 }} title="Narrative Evaluated" />
-                                  )}
+                                <div style={{ fontWeight: 600, fontSize: '13px', color: isActive ? 'var(--text-main)' : 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  ● {cleanName}
                                 </div>
                                 
                                 {!isEval && (
