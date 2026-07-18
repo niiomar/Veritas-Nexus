@@ -376,6 +376,8 @@ export default function App() {
                             statusHex = '#f59e0b'; // Amber/Orange
                           } else if (ast.verdict === 'TRUSTED' || ast.verdict === 'VERIFIED') {
                             statusHex = '#10b981'; // Green
+                          } else if (ast.verdict === 'INCONCLUSIVE') {
+                            statusHex = '#64748b'; // Dimmed Slate for Inconclusive
                           }
 
                           return (
