@@ -66,20 +66,34 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
   const exif = evidence.metadata_dict?.exif;
 
   // Narrative Claim State
-  // @ts-ignore
-  const [claim, setClaim] = useState(evidence.metadata_dict?.narrative_claim || '');
+  const [claim, setClaim] = useState('');
   const [isReconciling, setIsReconciling] = useState(false);
   const [reconciliation, setReconciliation] = useState<any>(null);
 
+  // LOAD CACHED NARRATIVE ON MOUNT
   useEffect(() => {
+    const cachedData = localStorage.getItem(`nexus_narrative_${evidence.id}`);
+    if (cachedData) {
+      try {
+        const parsed = JSON.parse(cachedData);
+        setClaim(parsed.claim || '');
+        setReconciliation(parsed.reconciliation || null);
+        return; // Exit early if we found cached data
+      } catch (e) {
+        console.error("Failed to parse cached narrative", e);
+      }
+    }
+    
+    // Fallback to empty or backend data if no cache exists
     // @ts-ignore
     setClaim(evidence.metadata_dict?.narrative_claim || '');
-    setReconciliation(null); // Reset analysis on new file
+    setReconciliation(null); 
   }, [evidence.id]);
 
   const saveNarrative = async () => {
     if (!claim.trim()) {
       setReconciliation(null);
+      localStorage.removeItem(`nexus_narrative_${evidence.id}`); // Clear cache if empty
       return;
     }
     
@@ -96,7 +110,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
       const hasHardware = exif?.fingerprint.make !== 'Unknown';
 
       // Smart Regex to distinguish Denial vs Admission
-      const deniesEditing = /(didn't|did not|never|no|not|without).*(edit|photoshop|touch|alter|change|filter)/.test(text) || text.includes('only took');
+      const deniesEditing = /(didn't|did not|never|no|not|without).*(edit|photoshop|touch|alter|change|filter)/.test(text) || text.includes('only took') || text.includes('only look');
       const admitsEditing = /(edit|photoshop|touch|alter|change|filter)/.test(text) && !deniesEditing;
       const claimsCapture = /(take|took|captured|shot)/.test(text);
 
@@ -144,7 +158,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
            conf = 91;
          }
       }
-      // Rule 4: No actionable claim found (Fixes the "okay" bug)
+      // Rule 4: No actionable claim found
       else {
         status = 'INSUFFICIENT';
         evidenceList.push('Statement lacks actionable forensic keywords.');
@@ -152,9 +166,26 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
         conf = 0;
       }
 
-      setReconciliation({ status, evidence: evidenceList, confidence: conf });
+      const recData = { status, evidence: evidenceList, confidence: conf };
+      setReconciliation(recData);
       setIsReconciling(false);
 
+      // SAVE TO BROWSER CACHE
+      localStorage.setItem(`nexus_narrative_${evidence.id}`, JSON.stringify({
+        claim: claim, // Preserve the exact text the user typed
+        reconciliation: recData
+      }));
+
+      // Backend API call (Uncomment when FastAPI is ready)
+      /* 
+      try {
+        await fetch(`${API_BASE_URL}/api/v1/evidence/${evidence.id}/narrative`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ claim, evaluation: recData })
+        });
+      } catch (err) { console.error(err); }
+      */
     }, 800);
   };
 
