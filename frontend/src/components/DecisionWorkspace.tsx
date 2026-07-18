@@ -56,14 +56,13 @@ const formatTimeNodes = (ts: string | undefined | null) => {
 
 export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evidence[], onClose: () => void }> = ({ evidence, caseEvidence, onClose }) => {
   const assessment = useMemo(() => AssessmentEngine.evaluate(evidence), [evidence]);
-  const detailedAssessment = assessment as any; // Cast to access dynamic matrix properties
+  const detailedAssessment = assessment as any; 
   
   const isEval = evidence.status !== 'COMPLETED' || !evidence.ai_report;
   const c2pa = evidence.ai_report?.c2pa_data;
   const vitProb = evidence.ai_report?.deepfake_probability;
   const platformStatus = evidence.ai_report?.platform_status;
   
-  // Read EXIF from metadata dict
   // @ts-ignore
   const exif = evidence.metadata_dict?.exif;
 
@@ -172,7 +171,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
             </div>
           </div>
 
-          {/* NEW WEIGHTED EVIDENCE MATRIX */}
+          {/* WEIGHTED EVIDENCE MATRIX */}
           <div style={{ padding: '0 48px 24px 48px', backgroundColor: 'rgba(255,255,255,0.01)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '32px', padding: '24px', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', backgroundColor: '#0a0a0c' }}>
               
@@ -241,8 +240,17 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
             </div>
           </div>
 
-          {/* TAB NAVIGATION */}
-          <div className="no-scrollbar mono" style={{ flexShrink: 0, display: 'flex', gap: '24px', padding: '0 48px', borderBottom: '1px solid rgba(255,255,255,0.05)', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          {/* IMPROVED TAB NAVIGATION */}
+          <div className="no-scrollbar mono" style={{ 
+            flexShrink: 0, 
+            display: 'flex', 
+            gap: '40px', 
+            padding: '0 48px', 
+            borderBottom: '1px solid rgba(255,255,255,0.05)', 
+            overflowX: 'auto', 
+            WebkitOverflowScrolling: 'touch',
+            marginTop: '8px'
+          }}>
             {[
               { id: 'MEDIA', label: 'MEDIA VIEW' },
               { id: 'METADATA', label: 'METADATA' },
@@ -259,15 +267,16 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                   flexShrink: 0,
                   background: 'transparent', 
                   border: 'none', 
-                  padding: '16px 4px', 
+                  padding: '20px 0', 
                   cursor: 'pointer', 
                   whiteSpace: 'nowrap', 
-                  fontSize: '10px', 
-                  fontWeight: mainTab === tab.id ? 600 : 400,
-                  letterSpacing: '0.08em', 
+                  fontSize: '11px', 
+                  fontWeight: mainTab === tab.id ? 600 : 500,
+                  letterSpacing: '0.12em', 
                   color: mainTab === tab.id ? 'var(--text-main)' : 'var(--text-muted)',
                   borderBottom: mainTab === tab.id ? '2px solid #3b82f6' : '2px solid transparent',
-                  transition: 'color 0.2s, border-bottom-color 0.2s'
+                  transition: 'color 0.2s, border-bottom-color 0.2s',
+                  outline: 'none'
                 }}
               >
                 {tab.label}
