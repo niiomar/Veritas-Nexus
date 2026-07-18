@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
-import { Disc, Edit2, Lock, ShieldCheck, Circle, Check, Copy, Link as LinkIcon, AlertTriangle, ChevronDown, ChevronRight, Maximize, ZoomIn, ZoomOut, Info, Camera, Clock, FileMinus, Target } from 'lucide-react';
+import { Disc, Edit2, Lock, ShieldCheck, Circle, Check, Copy, Link as LinkIcon, AlertTriangle, ChevronDown, ChevronRight, Maximize, ZoomIn, ZoomOut, Info, Camera, Clock, FileMinus, Target, Activity } from 'lucide-react';
 import type { Evidence } from '../types';
 import { AssessmentEngine } from '../services/assessment';
 
@@ -56,6 +56,8 @@ const formatTimeNodes = (ts: string | undefined | null) => {
 
 export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evidence[], onClose: () => void }> = ({ evidence, caseEvidence, onClose }) => {
   const assessment = useMemo(() => AssessmentEngine.evaluate(evidence), [evidence]);
+  const detailedAssessment = assessment as any; // Cast to access dynamic matrix properties
+  
   const isEval = evidence.status !== 'COMPLETED' || !evidence.ai_report;
   const c2pa = evidence.ai_report?.c2pa_data;
   const vitProb = evidence.ai_report?.deepfake_probability;
@@ -72,7 +74,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
   let finalColorType = assessment.type;
   if (assessment.type === 'crit' || platformStatus === 'CRITICAL THREAT' || isC2paBroken) {
     finalColorType = 'crit';
-  } else if (platformStatus === 'UNVERIFIED' || assessment.type === 'review' || assessment.type === 'neutral' || assessment.verdict === 'UNKNOWN') {
+  } else if (platformStatus === 'UNVERIFIED' || assessment.type === 'review' || assessment.type === 'neutral' || assessment.verdict === 'UNKNOWN' || assessment.verdict === 'INCONCLUSIVE') {
     finalColorType = 'review';
   } else {
     finalColorType = 'trust';
@@ -152,10 +154,10 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                 <span style={{ color: `var(--c-${finalColorType})` }}>████</span> EVIDENCE ASSESSMENT
               </div>
               <div style={{ fontSize: '24px', fontWeight: 800, color: `var(--c-${finalColorType})`, letterSpacing: '-0.02em', marginBottom: '4px' }}>
-                {platformStatus === 'UNVERIFIED' ? 'UNVERIFIED' : assessment.verdict.toUpperCase()}
+                {assessment.verdict.toUpperCase()}
               </div>
               <div style={{ fontSize: '13px', color: 'var(--text-main)' }}>
-                {evidence.ai_report?.disposition || 'Analysis complete. Refer to raw JSON for detailed execution trace.'}
+                {assessment.msg} — {evidence.ai_report?.disposition || 'Analysis complete.'}
               </div>
             </div>
             
@@ -170,28 +172,70 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
             </div>
           </div>
 
-          {/* EXECUTIVE EVIDENCE SUMMARY */}
-          <div style={{ padding: '0 48px 16px 48px', backgroundColor: 'rgba(255,255,255,0.01)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', padding: '12px 16px', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', backgroundColor: '#0a0a0c' }}>
+          {/* NEW WEIGHTED EVIDENCE MATRIX */}
+          <div style={{ padding: '0 48px 24px 48px', backgroundColor: 'rgba(255,255,255,0.01)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '32px', padding: '24px', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', backgroundColor: '#0a0a0c' }}>
               
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px' }}>
-                {exif?.fingerprint.make !== 'Unknown' ? <Check size={14} color="#10b981" /> : <AlertTriangle size={14} color="#f59e0b" />}
-                <span style={{ color: 'var(--text-muted)' }}>Original hardware {exif?.fingerprint.make !== 'Unknown' ? `identified (${exif?.fingerprint.make})` : 'obscured'}</span>
+              {/* Score Contributors */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', paddingRight: '16px', borderRight: '1px dashed rgba(255,255,255,0.1)' }}>
+                 <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '10px', color: 'var(--text-faint)', letterSpacing: '0.1em' }}>
+                   <Activity size={14} /> SCORE CONTRIBUTORS
+                 </div>
+                 
+                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '4px' }}>
+                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                     <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Authenticity</span>
+                     <span className="mono" style={{ fontSize: '13px', fontWeight: 600, color: detailedAssessment.contributors?.authenticity > 0 ? '#10b981' : detailedAssessment.contributors?.authenticity < 0 ? 'var(--c-crit)' : 'var(--text-faint)' }}>
+                       {detailedAssessment.contributors?.authenticity > 0 ? '+' : ''}{detailedAssessment.contributors?.authenticity || 0}
+                     </span>
+                   </div>
+                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                     <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Provenance</span>
+                     <span className="mono" style={{ fontSize: '13px', fontWeight: 600, color: detailedAssessment.contributors?.provenance > 0 ? '#10b981' : detailedAssessment.contributors?.provenance < 0 ? 'var(--c-crit)' : 'var(--text-faint)' }}>
+                       {detailedAssessment.contributors?.provenance > 0 ? '+' : ''}{detailedAssessment.contributors?.provenance || 0}
+                     </span>
+                   </div>
+                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                     <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Structural Consistency</span>
+                     <span className="mono" style={{ fontSize: '13px', fontWeight: 600, color: detailedAssessment.contributors?.structural > 0 ? '#10b981' : detailedAssessment.contributors?.structural < 0 ? 'var(--c-crit)' : 'var(--text-faint)' }}>
+                       {detailedAssessment.contributors?.structural > 0 ? '+' : ''}{detailedAssessment.contributors?.structural || 0}
+                     </span>
+                   </div>
+                 </div>
+                 
+                 <div style={{ marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.05)', fontSize: '10px', color: 'var(--text-faint)', lineHeight: 1.5 }}>
+                   Baseline integrity starts at 50. Modifiers are dynamically applied based on cryptographics, file structures, and neural inferences.
+                 </div>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px' }}>
-                {exif?.anomalies.likely_exported ? <AlertTriangle size={14} color="#f59e0b" /> : <Check size={14} color="#10b981" />}
-                <span style={{ color: 'var(--text-muted)' }}>Export signature {exif?.anomalies.likely_exported ? 'present' : 'clean'}</span>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px' }}>
-                {c2pa?.is_signed ? <Check size={14} color="#10b981" /> : <span style={{ color: '#ef4444' }}>✕</span>}
-                <span style={{ color: 'var(--text-muted)' }}>{c2pa?.is_signed ? 'Cryptographic provenance verified' : 'No C2PA provenance found'}</span>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px' }}>
-                {anomalyCount > 0 ? <span style={{ color: '#ef4444' }}>✕</span> : <Check size={14} color="#10b981" />}
-                <span style={{ color: 'var(--text-muted)' }}>{anomalyCount > 0 ? `High AI synthesis probability (${anomalyCount} regions)` : 'Low AI synthesis probability'}</span>
+              {/* The Matrix Ledger */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 2 }}>
+                 <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '10px', color: 'var(--text-faint)', letterSpacing: '0.1em' }}>
+                   <Target size={14} /> FORENSIC LEDGER TRANSACTIONS
+                 </div>
+                 
+                 <div className="no-scrollbar" style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '160px', overflowY: 'auto', paddingRight: '8px' }}>
+                   {detailedAssessment.matrix?.map((item: any, i: number) => {
+                      let color = 'var(--text-main)';
+                      let bg = 'rgba(255,255,255,0.02)';
+                      if (item.effect === 'Positive') { color = '#10b981'; bg = 'rgba(16, 185, 129, 0.05)'; }
+                      if (item.effect === 'Warning') { color = '#f59e0b'; bg = 'rgba(245, 158, 11, 0.05)'; }
+                      if (item.effect === 'Critical') { color = '#ef4444'; bg = 'rgba(239, 68, 68, 0.05)'; }
+                      if (item.effect === 'Neutral') { color = 'var(--text-muted)'; }
+                      
+                      return (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '10px 16px', backgroundColor: bg, border: `1px solid ${bg.replace('0.05', '0.1')}`, borderRadius: '4px' }}>
+                          <div className="mono" style={{ width: '40px', fontSize: '12px', color, fontWeight: 700, textAlign: 'right', flexShrink: 0 }}>
+                             {item.weight > 0 ? '+' : ''}{item.weight}
+                          </div>
+                          <div style={{ flex: 1, fontSize: '12px', color: 'var(--text-main)' }}>{item.evidence}</div>
+                          <div className="mono" style={{ fontSize: '9px', color: 'var(--text-faint)', letterSpacing: '0.05em', backgroundColor: 'rgba(0,0,0,0.5)', padding: '4px 8px', borderRadius: '4px' }}>
+                            {item.category.toUpperCase()}
+                          </div>
+                        </div>
+                      )
+                   })}
+                 </div>
               </div>
 
             </div>
@@ -403,7 +447,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                         </div>
                       </div>
                       
-                      {/* NEW CARD: Extended File & Telemetry Attributes */}
+                      {/* Extended File & Telemetry Attributes */}
                       <div style={{ backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '24px', gridColumn: '1 / -1' }}>
                         <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--text-faint)', letterSpacing: '0.1em', marginBottom: '16px' }}>
                           <Target size={14} /> FILE & TELEMETRY ATTRIBUTES
