@@ -31,7 +31,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             const isActive = activeCase?.id === c.id;
             const caseEv = evidenceLibrary.filter(e => e.case_id === c.id);
             
-            // NEW 4-TIER STATS CALCULATION
+            // NEW 5-TIER STATS CALCULATION
             const stats = caseEv.reduce((acc, ev) => {
               const { verdict } = AssessmentEngine.evaluate(ev);
               const platformStatus = ev.ai_report?.platform_status;
@@ -41,14 +41,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 acc.critical++;
               } else if (verdict === 'CONFLICT' || platformStatus === 'CONFLICT') {
                 acc.conflict++;
-              } else if (verdict === 'TRUSTED') {
+              } else if (verdict === 'TRUSTED' || verdict === 'VERIFIED') {
                 acc.verified++;
+              } else if (verdict === 'INCONCLUSIVE') {
+                acc.inconclusive++;
               } else {
-                // Catches UNVERIFIED, UNKNOWN, and standard images
+                // Catches UNVERIFIED, UNKNOWN, and standard/pending images
                 acc.unverified++;
               }
               return acc;
-            }, { verified: 0, unverified: 0, conflict: 0, critical: 0 });
+            }, { verified: 0, unverified: 0, conflict: 0, critical: 0, inconclusive: 0 });
 
             return (
               <div key={c.id} onClick={() => onSelectCase(c)} style={{
@@ -75,7 +77,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {caseEv.length} ASSETS
                 </div>
                 
-                {/* NEW 4-TIER UI GRID */}
+                {/* 5-TIER UI GRID */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '11px' }} className="mono">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: stats.verified > 0 ? '#10b981' : 'rgba(255,255,255,0.1)' }}></div>
@@ -95,6 +97,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: stats.critical > 0 ? '#ef4444' : 'rgba(255,255,255,0.1)', boxShadow: stats.critical > 0 ? '0 0 8px rgba(239,68,68,0.4)' : 'none' }}></div>
                     <span style={{ color: 'var(--text-muted)' }}><span style={{color: stats.critical > 0 ? 'var(--text-main)' : 'var(--text-faint)'}}>{stats.critical}</span> Critical</span>
+                  </div>
+
+                  {/* INCONCLUSIVE STATE */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', gridColumn: '1 / -1' }}>
+                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: stats.inconclusive > 0 ? '#64748b' : 'rgba(255,255,255,0.1)' }}></div>
+                    <span style={{ color: 'var(--text-muted)' }}><span style={{color: stats.inconclusive > 0 ? 'var(--text-main)' : 'var(--text-faint)'}}>{stats.inconclusive}</span> Inconclusive</span>
                   </div>
                 </div>
 
