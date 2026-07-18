@@ -92,6 +92,9 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
   
   const [c2paExpanded, setC2paExpanded] = useState(true);
   const [vitExpanded, setVitExpanded] = useState(true);
+  
+  // NEW: Collapse state for the massive matrix
+  const [isMatrixExpanded, setIsMatrixExpanded] = useState(false);
 
   const [zoom, setZoom] = useState(1);
   const [expandedCorrelation, setExpandedCorrelation] = useState<'ISSUER' | 'DAY' | null>(null);
@@ -147,7 +150,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
         <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
           
           {/* STABLE INVESTIGATION CONTEXT */}
-          <div style={{ flexShrink: 0, padding: '16px 48px 12px 48px', backgroundColor: 'rgba(255,255,255,0.01)', display: 'flex', flexWrap: 'wrap', gap: '20px', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ flexShrink: 0, padding: '16px 48px 16px 48px', backgroundColor: 'rgba(255,255,255,0.01)', display: 'flex', flexWrap: 'wrap', gap: '20px', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div style={{ flex: 1, minWidth: '300px' }}>
               <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '10px', letterSpacing: '0.1em', color: 'var(--text-faint)', marginBottom: '4px' }}>
                 <span style={{ color: `var(--c-${finalColorType})` }}>████</span> EVIDENCE ASSESSMENT
@@ -168,79 +171,106 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                   <span style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-main)' }}>{assessment.conf !== 'N/A' ? `${assessment.conf}%` : 'N/A'}</span>
                 </div>
               </div>
-            </div>
-          </div>
-
-          {/* WEIGHTED EVIDENCE MATRIX */}
-          <div style={{ padding: '0 48px 24px 48px', backgroundColor: 'rgba(255,255,255,0.01)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '32px', padding: '24px', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', backgroundColor: '#0a0a0c' }}>
               
-              {/* Score Contributors */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', paddingRight: '16px', borderRight: '1px dashed rgba(255,255,255,0.1)' }}>
-                 <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '10px', color: 'var(--text-faint)', letterSpacing: '0.1em' }}>
-                   <Activity size={14} /> SCORE CONTRIBUTORS
-                 </div>
-                 
-                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '4px' }}>
-                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                     <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Authenticity</span>
-                     <span className="mono" style={{ fontSize: '13px', fontWeight: 600, color: detailedAssessment.contributors?.authenticity > 0 ? '#10b981' : detailedAssessment.contributors?.authenticity < 0 ? 'var(--c-crit)' : 'var(--text-faint)' }}>
-                       {detailedAssessment.contributors?.authenticity > 0 ? '+' : ''}{detailedAssessment.contributors?.authenticity || 0}
-                     </span>
-                   </div>
-                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                     <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Provenance</span>
-                     <span className="mono" style={{ fontSize: '13px', fontWeight: 600, color: detailedAssessment.contributors?.provenance > 0 ? '#10b981' : detailedAssessment.contributors?.provenance < 0 ? 'var(--c-crit)' : 'var(--text-faint)' }}>
-                       {detailedAssessment.contributors?.provenance > 0 ? '+' : ''}{detailedAssessment.contributors?.provenance || 0}
-                     </span>
-                   </div>
-                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                     <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Structural Consistency</span>
-                     <span className="mono" style={{ fontSize: '13px', fontWeight: 600, color: detailedAssessment.contributors?.structural > 0 ? '#10b981' : detailedAssessment.contributors?.structural < 0 ? 'var(--c-crit)' : 'var(--text-faint)' }}>
-                       {detailedAssessment.contributors?.structural > 0 ? '+' : ''}{detailedAssessment.contributors?.structural || 0}
-                     </span>
-                   </div>
-                 </div>
-                 
-                 <div style={{ marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.05)', fontSize: '10px', color: 'var(--text-faint)', lineHeight: 1.5 }}>
-                   Baseline integrity starts at 50. Modifiers are dynamically applied based on cryptographics, file structures, and neural inferences.
-                 </div>
-              </div>
-
-              {/* The Matrix Ledger */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 2 }}>
-                 <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '10px', color: 'var(--text-faint)', letterSpacing: '0.1em' }}>
-                   <Target size={14} /> FORENSIC LEDGER TRANSACTIONS
-                 </div>
-                 
-                 <div className="no-scrollbar" style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '160px', overflowY: 'auto', paddingRight: '8px' }}>
-                   {detailedAssessment.matrix?.map((item: any, i: number) => {
-                      let color = 'var(--text-main)';
-                      let bg = 'rgba(255,255,255,0.02)';
-                      if (item.effect === 'Positive') { color = '#10b981'; bg = 'rgba(16, 185, 129, 0.05)'; }
-                      if (item.effect === 'Warning') { color = '#f59e0b'; bg = 'rgba(245, 158, 11, 0.05)'; }
-                      if (item.effect === 'Critical') { color = '#ef4444'; bg = 'rgba(239, 68, 68, 0.05)'; }
-                      if (item.effect === 'Neutral') { color = 'var(--text-muted)'; }
-                      
-                      return (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '10px 16px', backgroundColor: bg, border: `1px solid ${bg.replace('0.05', '0.1')}`, borderRadius: '4px' }}>
-                          <div className="mono" style={{ width: '40px', fontSize: '12px', color, fontWeight: 700, textAlign: 'right', flexShrink: 0 }}>
-                             {item.weight > 0 ? '+' : ''}{item.weight}
-                          </div>
-                          <div style={{ flex: 1, fontSize: '12px', color: 'var(--text-main)' }}>{item.evidence}</div>
-                          <div className="mono" style={{ fontSize: '9px', color: 'var(--text-faint)', letterSpacing: '0.05em', backgroundColor: 'rgba(0,0,0,0.5)', padding: '4px 8px', borderRadius: '4px' }}>
-                            {item.category.toUpperCase()}
-                          </div>
-                        </div>
-                      )
-                   })}
-                 </div>
-              </div>
-
+              {/* THE MATRIX TOGGLE BUTTON */}
+              <button 
+                onClick={() => setIsMatrixExpanded(!isMatrixExpanded)} 
+                className="hover-bright mono" 
+                style={{ 
+                  marginTop: '8px', 
+                  background: isMatrixExpanded ? 'rgba(255,255,255,0.05)' : 'transparent', 
+                  border: '1px solid rgba(255,255,255,0.1)', 
+                  borderRadius: '4px', 
+                  padding: '6px', 
+                  fontSize: '9px', 
+                  color: isMatrixExpanded ? 'var(--text-main)' : 'var(--text-muted)', 
+                  cursor: 'pointer', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  gap: '4px', 
+                  width: '100%',
+                  transition: 'all 0.2s'
+                }}
+              >
+                 {isMatrixExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                 {isMatrixExpanded ? 'HIDE SCORING MATRIX' : 'VIEW SCORING MATRIX'}
+              </button>
             </div>
           </div>
 
-          {/* IMPROVED TAB NAVIGATION */}
+          {/* COLLAPSIBLE WEIGHTED EVIDENCE MATRIX */}
+          {isMatrixExpanded && (
+            <div className="animate-fade-in" style={{ padding: '0 48px 16px 48px', backgroundColor: 'rgba(255,255,255,0.01)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '32px', padding: '24px', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', backgroundColor: '#0a0a0c' }}>
+                
+                {/* Score Contributors */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', paddingRight: '16px', borderRight: '1px dashed rgba(255,255,255,0.1)' }}>
+                   <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '10px', color: 'var(--text-faint)', letterSpacing: '0.1em' }}>
+                     <Activity size={14} /> SCORE CONTRIBUTORS
+                   </div>
+                   
+                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '4px' }}>
+                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                       <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Authenticity</span>
+                       <span className="mono" style={{ fontSize: '13px', fontWeight: 600, color: detailedAssessment.contributors?.authenticity > 0 ? '#10b981' : detailedAssessment.contributors?.authenticity < 0 ? 'var(--c-crit)' : 'var(--text-faint)' }}>
+                         {detailedAssessment.contributors?.authenticity > 0 ? '+' : ''}{detailedAssessment.contributors?.authenticity || 0}
+                       </span>
+                     </div>
+                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                       <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Provenance</span>
+                       <span className="mono" style={{ fontSize: '13px', fontWeight: 600, color: detailedAssessment.contributors?.provenance > 0 ? '#10b981' : detailedAssessment.contributors?.provenance < 0 ? 'var(--c-crit)' : 'var(--text-faint)' }}>
+                         {detailedAssessment.contributors?.provenance > 0 ? '+' : ''}{detailedAssessment.contributors?.provenance || 0}
+                       </span>
+                     </div>
+                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                       <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Structural Consistency</span>
+                       <span className="mono" style={{ fontSize: '13px', fontWeight: 600, color: detailedAssessment.contributors?.structural > 0 ? '#10b981' : detailedAssessment.contributors?.structural < 0 ? 'var(--c-crit)' : 'var(--text-faint)' }}>
+                         {detailedAssessment.contributors?.structural > 0 ? '+' : ''}{detailedAssessment.contributors?.structural || 0}
+                       </span>
+                     </div>
+                   </div>
+                   
+                   <div style={{ marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.05)', fontSize: '10px', color: 'var(--text-faint)', lineHeight: 1.5 }}>
+                     Baseline integrity starts at 50. Modifiers are dynamically applied based on cryptographics, file structures, and neural inferences.
+                   </div>
+                </div>
+
+                {/* The Matrix Ledger */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 2 }}>
+                   <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '10px', color: 'var(--text-faint)', letterSpacing: '0.1em' }}>
+                     <Target size={14} /> FORENSIC LEDGER TRANSACTIONS
+                   </div>
+                   
+                   <div className="no-scrollbar" style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '160px', overflowY: 'auto', paddingRight: '8px' }}>
+                     {detailedAssessment.matrix?.map((item: any, i: number) => {
+                        let color = 'var(--text-main)';
+                        let bg = 'rgba(255,255,255,0.02)';
+                        if (item.effect === 'Positive') { color = '#10b981'; bg = 'rgba(16, 185, 129, 0.05)'; }
+                        if (item.effect === 'Warning') { color = '#f59e0b'; bg = 'rgba(245, 158, 11, 0.05)'; }
+                        if (item.effect === 'Critical') { color = '#ef4444'; bg = 'rgba(239, 68, 68, 0.05)'; }
+                        if (item.effect === 'Neutral') { color = 'var(--text-muted)'; }
+                        
+                        return (
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '10px 16px', backgroundColor: bg, border: `1px solid ${bg.replace('0.05', '0.1')}`, borderRadius: '4px' }}>
+                            <div className="mono" style={{ width: '40px', fontSize: '12px', color, fontWeight: 700, textAlign: 'right', flexShrink: 0 }}>
+                               {item.weight > 0 ? '+' : ''}{item.weight}
+                            </div>
+                            <div style={{ flex: 1, fontSize: '12px', color: 'var(--text-main)' }}>{item.evidence}</div>
+                            <div className="mono" style={{ fontSize: '9px', color: 'var(--text-faint)', letterSpacing: '0.05em', backgroundColor: 'rgba(0,0,0,0.5)', padding: '4px 8px', borderRadius: '4px' }}>
+                              {item.category.toUpperCase()}
+                            </div>
+                          </div>
+                        )
+                     })}
+                   </div>
+                </div>
+
+              </div>
+            </div>
+          )}
+
+          {/* MAIN TAB NAVIGATION */}
           <div className="no-scrollbar mono" style={{ 
             flexShrink: 0, 
             display: 'flex', 
@@ -285,7 +315,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
           </div>
 
           {/* TAB CONTENT AREA */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '32px 48px' }}>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '40px 48px' }}>
             
             {mainTab === 'MEDIA' && (
               <div style={{ display: 'flex', flexDirection: 'column', width: '100%', maxWidth: '1000px', margin: '0 auto', gap: '24px' }}>
@@ -296,19 +326,19 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                 ) : (
                   <div style={{ width: '100%', backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', overflow: 'hidden' }}>
                     
-                    <div className="mono" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 16px', backgroundColor: '#111', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                        <span style={{ fontSize: '10px', color: 'var(--text-main)', paddingRight: '8px', borderRight: '1px solid rgba(255,255,255,0.1)' }}>{Math.round(zoom * 100)}%</span>
-                        <button onClick={() => setZoom(z => Math.max(z - 0.25, 0.25))} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px' }} className="hover-bright"><ZoomOut size={12} /> OUT</button>
-                        <button onClick={() => setZoom(z => Math.min(z + 0.25, 4))} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px' }} className="hover-bright"><ZoomIn size={12} /> IN</button>
-                        <button onClick={() => setZoom(1)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px' }} className="hover-bright"><Maximize size={12} /> FIT</button>
+                    <div className="mono" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 32px', backgroundColor: '#111', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+                        <span style={{ fontSize: '11px', color: 'var(--text-main)', paddingRight: '12px', borderRight: '1px solid rgba(255,255,255,0.1)' }}>{Math.round(zoom * 100)}%</span>
+                        <button onClick={() => setZoom(z => Math.max(z - 0.25, 0.25))} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px' }} className="hover-bright"><ZoomOut size={14} /> OUT</button>
+                        <button onClick={() => setZoom(z => Math.min(z + 0.25, 4))} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px' }} className="hover-bright"><ZoomIn size={14} /> IN</button>
+                        <button onClick={() => setZoom(1)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px' }} className="hover-bright"><Maximize size={14} /> FIT</button>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                        <button onClick={() => setMainTab('RAW')} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px' }} className="hover-bright"><Info size={12} /> METADATA</button>
+                        <button onClick={() => setMainTab('RAW')} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px' }} className="hover-bright"><Info size={14} /> METADATA</button>
                       </div>
                     </div>
 
-                    <div className="no-scrollbar" style={{ display: 'flex', overflowX: 'auto', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div className="no-scrollbar" style={{ display: 'flex', gap: '16px', overflowX: 'auto', borderBottom: '1px solid rgba(255,255,255,0.05)', padding: '0 32px' }}>
                       {['SOURCE', 'HEATMAP', 'PATCHES', 'ATTENTION'].map((tab) => (
                         <button 
                           key={tab} 
@@ -317,7 +347,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                             if (imageFailed) setImageFailed(false);
                           }}
                           className="mono hover-bright"
-                          style={{ flex: '1 0 auto', padding: '12px 16px', background: 'transparent', border: 'none', borderBottom: imageTab === tab ? '2px solid #3b82f6' : '2px solid transparent', color: imageTab === tab ? 'var(--text-main)' : 'var(--text-muted)', fontSize: '10px', letterSpacing: '0.1em', cursor: 'pointer', transition: 'all 0.2s' }}
+                          style={{ flex: '1 0 auto', padding: '20px 24px', background: 'transparent', border: 'none', borderBottom: imageTab === tab ? '2px solid #3b82f6' : '2px solid transparent', color: imageTab === tab ? 'var(--text-main)' : 'var(--text-muted)', fontSize: '11px', letterSpacing: '0.15em', cursor: 'pointer', transition: 'all 0.2s' }}
                         >{tab}</button>
                       ))}
                     </div>
@@ -347,7 +377,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                       )}
                     </div>
                     
-                    <div className="mono" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', padding: '16px', fontSize: '11px', color: 'var(--text-faint)', letterSpacing: '0.05em', background: 'rgba(255,255,255,0.02)', gap: '16px' }}>
+                    <div className="mono" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', padding: '24px 32px', fontSize: '11px', color: 'var(--text-faint)', letterSpacing: '0.05em', background: 'rgba(255,255,255,0.02)', gap: '24px' }}>
                       <div>
                         <div style={{marginBottom: '8px'}}>HEATMAP INTENSITY</div>
                         <div style={{ position: 'relative', height: '4px', width: '100%', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '2px' }}>
@@ -393,7 +423,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
                       
                       {/* Fingerprint Card */}
-                      <div style={{ backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '24px' }}>
+                      <div style={{ backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '32px' }}>
                         <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--text-faint)', letterSpacing: '0.1em', marginBottom: '16px' }}>
                           <Camera size={14} /> HARDWARE / SOFTWARE FINGERPRINT
                         </div>
@@ -406,7 +436,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                       </div>
 
                       {/* Anomaly & Stripping Card */}
-                      <div style={{ backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '24px' }}>
+                      <div style={{ backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '32px' }}>
                         <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--text-faint)', letterSpacing: '0.1em', marginBottom: '16px' }}>
                           <FileMinus size={14} /> FORENSIC FLAGS
                         </div>
@@ -457,7 +487,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                       </div>
                       
                       {/* Extended File & Telemetry Attributes */}
-                      <div style={{ backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '24px', gridColumn: '1 / -1' }}>
+                      <div style={{ backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '32px', gridColumn: '1 / -1' }}>
                         <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--text-faint)', letterSpacing: '0.1em', marginBottom: '16px' }}>
                           <Target size={14} /> FILE & TELEMETRY ATTRIBUTES
                         </div>
@@ -511,7 +541,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                     </div>
 
                     {/* Timeline Strip */}
-                    <div style={{ backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '24px' }}>
+                    <div style={{ backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '32px' }}>
                       <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--text-faint)', letterSpacing: '0.1em', marginBottom: '20px' }}>
                         <Clock size={14} /> EXIF TIMELINE RECONSTRUCTION
                       </div>
@@ -537,7 +567,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
 
             {mainTab === 'PROVENANCE' && (
               <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
-                <div style={{ backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '32px' }}>
+                <div style={{ backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '40px' }}>
                   {isC2paBypassed ? (
                     <div style={{ padding: '48px 32px', color: 'var(--text-muted)', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '6px', textAlign: 'center' }}>
                       <span className="mono" style={{ fontSize: '12px' }}>⚠ CRYPTOGRAPHIC VERIFICATION BYPASSED BY USER.</span>
@@ -593,7 +623,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                     <div style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '400px', margin: '0 auto' }}>Issuer credentials cannot be trusted. The signature hash does not match the asset's current state.</div>
                   </div>
                 ) : c2pa?.is_signed ? (
-                   <div style={{ backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '12px', padding: '32px', position: 'relative', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.4)' }}>
+                   <div style={{ backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '12px', padding: '40px', position: 'relative', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.4)' }}>
                      <div style={{ position: 'absolute', top: '-20px', right: '-20px', fontSize: '180px', opacity: 0.02, color: 'white', pointerEvents: 'none', userSelect: 'none' }}>⌘</div>
                      
                      <div style={{ borderBottom: '2px dashed rgba(255,255,255,0.1)', paddingBottom: '24px', marginBottom: '24px', textAlign: 'center' }}>
@@ -642,7 +672,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
 
             {mainTab === 'CORRELATION' && (
               <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-                <div style={{ backgroundColor: '#050505', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '24px' }}>
+                <div style={{ backgroundColor: '#050505', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '32px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', paddingBottom: '20px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                          <LinkIcon size={16} color={sameIssuer.length > 0 ? '#3b82f6' : 'var(--text-faint)'} style={{ marginTop: '2px', flexShrink: 0 }} />
@@ -719,7 +749,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
             {mainTab === 'RAW' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '1000px', margin: '0 auto' }}>
                 <div style={{ backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                  <div className="mono" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: c2paExpanded ? '1px solid rgba(255,255,255,0.05)' : 'none', backgroundColor: '#111' }}>
+                  <div className="mono" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', borderBottom: c2paExpanded ? '1px solid rgba(255,255,255,0.05)' : 'none', backgroundColor: '#111' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                       <button onClick={() => setC2paExpanded(!c2paExpanded)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0, display: 'flex' }}>
                         {c2paExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
@@ -731,14 +761,14 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                     </button>
                   </div>
                   {c2paExpanded && (
-                    <div style={{ padding: '16px', overflowY: 'auto', maxHeight: '400px' }}>
+                    <div style={{ padding: '24px', overflowY: 'auto', maxHeight: '400px' }}>
                       <pre className="mono" style={{ fontSize: '11px', margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }} dangerouslySetInnerHTML={{ __html: syntaxHighlight(evidence.ai_report?.c2pa_data || { status: 'No C2PA metadata available' }) }} />
                     </div>
                   )}
                 </div>
 
                 <div style={{ backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                  <div className="mono" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: vitExpanded ? '1px solid rgba(255,255,255,0.05)' : 'none', backgroundColor: '#111' }}>
+                  <div className="mono" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', borderBottom: vitExpanded ? '1px solid rgba(255,255,255,0.05)' : 'none', backgroundColor: '#111' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                       <button onClick={() => setVitExpanded(!vitExpanded)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0, display: 'flex' }}>
                         {vitExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
@@ -750,7 +780,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                     </button>
                   </div>
                   {vitExpanded && (
-                    <div style={{ padding: '16px', overflowY: 'auto', maxHeight: '400px' }}>
+                    <div style={{ padding: '24px', overflowY: 'auto', maxHeight: '400px' }}>
                       <pre className="mono" style={{ fontSize: '11px', margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }} dangerouslySetInnerHTML={{ __html: syntaxHighlight({ deepfake_probability: evidence.ai_report?.deepfake_probability ?? null, platform_status: evidence.ai_report?.platform_status || 'UNKNOWN', disposition: evidence.ai_report?.disposition || 'No disposition available' }) }} />
                     </div>
                   )}
