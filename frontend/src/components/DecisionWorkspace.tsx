@@ -297,8 +297,14 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                             <div className="mono" style={{ width: '40px', fontSize: '12px', color, fontWeight: 700, textAlign: 'right', flexShrink: 0 }}>
                                {item.weight > 0 ? '+' : ''}{item.weight}
                             </div>
-                            <div style={{ flex: 1, fontSize: '12px', color: 'var(--text-main)' }}>{item.evidence}</div>
-                            <div className="mono" style={{ fontSize: '9px', color: 'var(--text-faint)', letterSpacing: '0.05em', backgroundColor: 'rgba(0,0,0,0.5)', padding: '4px 8px', borderRadius: '4px' }}>
+                            
+                            {/* FIX: minWidth 0 and wordWrap applied here so flex doesn't overflow parent */}
+                            <div style={{ flex: 1, fontSize: '12px', color: 'var(--text-main)', minWidth: 0, wordWrap: 'break-word' }}>
+                              {item.evidence}
+                            </div>
+                            
+                            {/* FIX: flexShrink 0 and whiteSpace nowrap added to the category badge */}
+                            <div className="mono" style={{ fontSize: '9px', color: 'var(--text-faint)', letterSpacing: '0.05em', backgroundColor: 'rgba(0,0,0,0.5)', padding: '4px 8px', borderRadius: '4px', flexShrink: 0, whiteSpace: 'nowrap' }}>
                               {item.category.toUpperCase()}
                             </div>
                           </div>
@@ -315,7 +321,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
           <div className="no-scrollbar mono" style={{ 
             flexShrink: 0, 
             display: 'flex', 
-            gap: '64px', 
+            gap: '40px', 
             padding: '0 48px', 
             borderBottom: '1px solid rgba(255,255,255,0.05)', 
             overflowX: 'auto', 
