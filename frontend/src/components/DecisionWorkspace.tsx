@@ -79,6 +79,32 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
     finalColorType = 'trust';
   }
 
+  // --- GAUGE CALCULATIONS ---
+  const confValue = assessment.conf !== 'N/A' ? parseFloat(assessment.conf) : 0;
+  const gaugeRadius = 13;
+  const gaugeCircumference = 2 * Math.PI * gaugeRadius;
+  const gaugeOffset = gaugeCircumference - (confValue / 100) * gaugeCircumference;
+
+  // --- TIMELINE FORENSIC REASONING CALCULATIONS ---
+  const parseExifDate = (dateStr: string) => {
+    if (!dateStr) return null;
+    const normalized = dateStr.replace(/^(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3');
+    const d = new Date(normalized);
+    return isNaN(d.getTime()) ? null : d;
+  };
+
+  let originDate: Date | null = null;
+  if (exif?.timeline) {
+    const rawOrigin = exif.timeline['DateTimeOriginal'] || exif.timeline['CreateDate'];
+    if (rawOrigin) originDate = parseExifDate(rawOrigin as string);
+    if (!originDate) {
+      Object.values(exif.timeline).forEach((v) => {
+        const d = parseExifDate(v as string);
+        if (d && (!originDate || d < originDate)) originDate = d;
+      });
+    }
+  }
+
   const history = c2pa?.manifest_history?.length 
     ? c2pa.manifest_history 
     : [{ action: 'Origin', agent: 'Unknown Sensor/Software', timestamp: evidence.created_at || 'Unknown', description: 'Initial file creation' }];
@@ -93,7 +119,6 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
   const [c2paExpanded, setC2paExpanded] = useState(true);
   const [vitExpanded, setVitExpanded] = useState(true);
   
-  // NEW: Collapse state for the massive matrix
   const [isMatrixExpanded, setIsMatrixExpanded] = useState(false);
 
   const [zoom, setZoom] = useState(1);
@@ -164,15 +189,31 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', minWidth: '200px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '10px 16px', backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px' }}>
-                <div style={{ position: 'relative', width: '28px', height: '28px', borderRadius: '50%', border: '3px solid rgba(255,255,255,0.1)', borderTopColor: assessment.conf !== 'N/A' ? `var(--c-${finalColorType})` : 'rgba(255,255,255,0.1)' }}></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '8px 16px', backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px' }}>
+                
+                {/* RADIAL PROGRESS GAUGE */}
+                <div style={{ position: 'relative', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg width="32" height="32" style={{ transform: 'rotate(-90deg)', overflow: 'visible' }}>
+                    <circle cx="16" cy="16" r={gaugeRadius} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3.5" />
+                    <circle 
+                      cx="16" cy="16" r={gaugeRadius} 
+                      fill="none" 
+                      stroke={assessment.conf !== 'N/A' ? `var(--c-${finalColorType})` : 'rgba(255,255,255,0.1)'} 
+                      strokeWidth="3.5" 
+                      strokeDasharray={gaugeCircumference} 
+                      strokeDashoffset={assessment.conf !== 'N/A' ? gaugeOffset : gaugeCircumference} 
+                      strokeLinecap="round" 
+                      style={{ transition: 'stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1)' }} 
+                    />
+                  </svg>
+                </div>
+
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <span className="mono" style={{ fontSize: '9px', color: 'var(--text-faint)', letterSpacing: '0.1em' }}>EVIDENCE INTEGRITY</span>
                   <span style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-main)' }}>{assessment.conf !== 'N/A' ? `${assessment.conf}%` : 'N/A'}</span>
                 </div>
               </div>
               
-              {/* THE MATRIX TOGGLE BUTTON */}
               <button 
                 onClick={() => setIsMatrixExpanded(!isMatrixExpanded)} 
                 className="hover-bright mono" 
@@ -274,12 +315,12 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
           <div className="no-scrollbar mono" style={{ 
             flexShrink: 0, 
             display: 'flex', 
-            gap: '40px', 
+            gap: '64px', 
             padding: '0 48px', 
             borderBottom: '1px solid rgba(255,255,255,0.05)', 
             overflowX: 'auto', 
             WebkitOverflowScrolling: 'touch',
-            marginTop: '8px'
+            marginTop: '8px' 
           }}>
             {[
               { id: 'MEDIA', label: 'MEDIA VIEW' },
@@ -297,12 +338,12 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                   flexShrink: 0,
                   background: 'transparent', 
                   border: 'none', 
-                  padding: '20px 0', 
+                  padding: '24px 0', 
                   cursor: 'pointer', 
                   whiteSpace: 'nowrap', 
-                  fontSize: '11px', 
+                  fontSize: '12px', 
                   fontWeight: mainTab === tab.id ? 600 : 500,
-                  letterSpacing: '0.12em', 
+                  letterSpacing: '0.15em', 
                   color: mainTab === tab.id ? 'var(--text-main)' : 'var(--text-muted)',
                   borderBottom: mainTab === tab.id ? '2px solid #3b82f6' : '2px solid transparent',
                   transition: 'color 0.2s, border-bottom-color 0.2s',
@@ -549,14 +590,30 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                         <div className="mono" style={{ fontSize: '11px', color: 'var(--text-muted)' }}>No EXIF timestamps extracted.</div>
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                          {Object.entries(exif.timeline).map(([key, value]) => (
-                            <div key={key} style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
-                              <div style={{ minWidth: '180px', flexShrink: 0 }}>
-                                <div className="mono" style={{ fontSize: '10px', color: 'var(--text-main)', padding: '4px 8px', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '4px', display: 'inline-block' }}>{key}</div>
+                          {Object.entries(exif.timeline).map(([key, value]) => {
+                            const currentDate = parseExifDate(value as string);
+                            let diffDays = 0;
+                            if (currentDate && originDate) {
+                              diffDays = Math.floor((currentDate.getTime() - originDate.getTime()) / (1000 * 60 * 60 * 24));
+                            }
+
+                            return (
+                              <div key={key} style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
+                                <div style={{ minWidth: '180px', flexShrink: 0 }}>
+                                  <div className="mono" style={{ fontSize: '10px', color: 'var(--text-main)', padding: '4px 8px', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '4px', display: 'inline-block' }}>{key}</div>
+                                </div>
+                                <div className="mono" style={{ fontSize: '12px', color: 'var(--text-muted)', paddingTop: '3px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  <span>{value as string}</span>
+                                  {diffDays > 0 && (
+                                    <span style={{ fontSize: '10px', color: 'var(--c-warn)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                      <AlertTriangle size={10} />
+                                      {diffDays} days after capture — possible re-export or delayed transfer
+                                    </span>
+                                  )}
+                                </div>
                               </div>
-                              <div className="mono" style={{ fontSize: '12px', color: 'var(--text-muted)', paddingTop: '3px' }}>{value as string}</div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </div>
