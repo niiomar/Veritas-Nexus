@@ -66,7 +66,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
   // @ts-ignore
   const exif = evidence.metadata_dict?.exif;
 
-  const isVitBypassed = vitProb === null;
+  const isVitUnavailable = vitProb === null;
   const isC2paBypassed = c2pa?.raw_status === "Bypassed by User";
   const isC2paBroken = c2pa?.status === "BROKEN_SIGNATURE";
   
@@ -77,6 +77,12 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
     finalColorType = 'review';
   } else {
     finalColorType = 'trust';
+  }
+
+  // --- OVERRIDE BACKEND DISPOSITION STRING ---
+  let dispositionText = evidence.ai_report?.disposition || 'Analysis complete.';
+  if (dispositionText.includes('bypassed/offline')) {
+    dispositionText = dispositionText.replace('bypassed/offline', 'unavailable (no viable subject)');
   }
 
   // --- GAUGE CALCULATIONS ---
@@ -184,7 +190,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                 {assessment.verdict.toUpperCase()}
               </div>
               <div style={{ fontSize: '13px', color: 'var(--text-main)' }}>
-                {assessment.msg} — {evidence.ai_report?.disposition || 'Analysis complete.'}
+                {assessment.msg} — {dispositionText}
               </div>
             </div>
             
@@ -297,13 +303,9 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                             <div className="mono" style={{ width: '40px', fontSize: '12px', color, fontWeight: 700, textAlign: 'right', flexShrink: 0 }}>
                                {item.weight > 0 ? '+' : ''}{item.weight}
                             </div>
-                            
-                            {/* FIX: minWidth 0 and wordWrap applied here so flex doesn't overflow parent */}
                             <div style={{ flex: 1, fontSize: '12px', color: 'var(--text-main)', minWidth: 0, wordWrap: 'break-word' }}>
                               {item.evidence}
                             </div>
-                            
-                            {/* FIX: flexShrink 0 and whiteSpace nowrap added to the category badge */}
                             <div className="mono" style={{ fontSize: '9px', color: 'var(--text-faint)', letterSpacing: '0.05em', backgroundColor: 'rgba(0,0,0,0.5)', padding: '4px 8px', borderRadius: '4px', flexShrink: 0, whiteSpace: 'nowrap' }}>
                               {item.category.toUpperCase()}
                             </div>
@@ -366,9 +368,9 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
             
             {mainTab === 'MEDIA' && (
               <div style={{ display: 'flex', flexDirection: 'column', width: '100%', maxWidth: '1000px', margin: '0 auto', gap: '24px' }}>
-                {isVitBypassed ? (
+                {isVitUnavailable ? (
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '400px', color: 'var(--text-muted)', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '8px', backgroundColor: 'rgba(255,255,255,0.01)' }}>
-                    <span className="mono">⚠ NEURAL INFERENCE ENGINE BYPASSED.</span>
+                    <span className="mono">⚠ NEURAL INFERENCE UNAVAILABLE (NO SUBJECT DETECTED).</span>
                   </div>
                 ) : (
                   <div style={{ width: '100%', backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', overflow: 'hidden' }}>
