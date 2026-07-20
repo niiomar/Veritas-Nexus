@@ -79,13 +79,13 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
     finalColorType = 'trust';
   }
 
-  // --- OVERRIDE BACKEND DISPOSITION STRING ---
+  // OVERRIDE BACKEND DISPOSITION STRING
   let dispositionText = evidence.ai_report?.disposition || 'Analysis complete.';
   if (dispositionText.includes('bypassed/offline')) {
     dispositionText = dispositionText.replace('bypassed/offline', 'unavailable (no viable subject)');
   }
 
-  // --- GAUGE CALCULATIONS ---
+  // GAUGE CALCULATIONS
   const confValue = assessment.conf !== 'N/A' ? parseFloat(assessment.conf) : 0;
   const gaugeRadius = 13;
   const gaugeCircumference = 2 * Math.PI * gaugeRadius;
@@ -398,7 +398,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
 
                   <div style={{ width: '100%', height: '55vh', minHeight: '450px', backgroundColor: '#000', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                     
-                    {/* NEW CONDITIONAL RENDERING: Render Warning ONLY if trying to access neural tabs on a faceless image */}
+                    {/* Render Warning ONLY if trying to access neural tabs on a faceless image */}
                     {imageTab !== 'SOURCE' && isVitUnavailable ? (
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', zIndex: 10 }}>
                         <div className="mono" style={{ color: 'var(--c-warn)', fontSize: '11px', letterSpacing: '0.15em' }}>⚠ ViT-CORE INFERENCE UNAVAILABLE</div>
