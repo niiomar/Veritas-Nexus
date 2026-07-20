@@ -91,7 +91,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
   const gaugeCircumference = 2 * Math.PI * gaugeRadius;
   const gaugeOffset = gaugeCircumference - (confValue / 100) * gaugeCircumference;
 
-  // --- TIMELINE FORENSIC REASONING CALCULATIONS ---
+  // TIMELINE FORENSIC REASONING CALCULATIONS
   const parseExifDate = (dateStr: string) => {
     if (!dateStr) return null;
     const normalized = dateStr.replace(/^(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3');
