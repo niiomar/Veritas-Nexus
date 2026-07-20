@@ -8,14 +8,15 @@ interface CreateCaseModalProps {
 export const CreateCaseModal: React.FC<CreateCaseModalProps> = ({ onClose, onSubmit }) => {
   const [alias, setAlias] = useState('');
   const [name, setName] = useState('');
-  // THE FIX: Changed default from 'Routine' to 'LOW' to match Python Enum
+ 
+  // SET default priority to'LOW'
   const [priority, setPriority] = useState('LOW');
   const [analyst, setAnalyst] = useState('Analyst_01');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSubmit({
-      id: crypto.randomUUID(), // Generates a valid UUID for the database
+      id: crypto.randomUUID(),  // Generates a valid UUID for the database
       alias: alias.toUpperCase(),
       name,
       priority,
@@ -47,7 +48,7 @@ export const CreateCaseModal: React.FC<CreateCaseModalProps> = ({ onClose, onSub
             <div>
               <label className="mono" style={{ display: 'block', fontSize: '10px', color: 'var(--text-faint)', marginBottom: '8px' }}>PRIORITY</label>
               <select value={priority} onChange={e => setPriority(e.target.value)} style={{ width: '100%', backgroundColor: '#050505', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-main)', padding: '10px', borderRadius: '4px' }}>
-                {/* THE FIX: Replaced values with strict backend equivalents */}
+    
                 <option value="LOW">Low (Routine)</option>
                 <option value="MEDIUM">Medium</option>
                 <option value="HIGH">High</option>
