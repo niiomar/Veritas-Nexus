@@ -66,7 +66,7 @@ export const EvidenceAPI = {
     return true;
   },
 
-  // ADDED: useVit and useC2pa parameters
+  // useVit and useC2pa parameters
   uploadPayload: async (file: File, caseId: string, uploadedBy: string = "Analyst_01", useVit: boolean = true, useC2pa: boolean = true) => {
     const formData = new FormData();
     formData.append("file", file);
