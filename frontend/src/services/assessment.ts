@@ -19,7 +19,6 @@ export interface DetailedEvidenceAssessment extends EvidenceAssessment {
 
 export const AssessmentEngine = {
   evaluate: (evidence: Evidence): DetailedEvidenceAssessment => {
-    // 1. Initial Loading State
     if (!evidence.ai_report) {
       return { 
         verdict: "EVALUATING" as any, 
@@ -37,9 +36,8 @@ export const AssessmentEngine = {
     // @ts-ignore
     const exif = evidence.metadata_dict?.exif;
 
-    // 2. The Ledger Setup
     const matrix: EvidenceMatrixItem[] = [];
-    let score = 50; // Baseline assumption
+    let score = 50; 
     
     let authScore = 0;
     let provScore = 0;
@@ -53,7 +51,7 @@ export const AssessmentEngine = {
       if (category === 'Structural') structScore += weight;
     };
 
-    // --- 3. PROVENANCE & AUTHENTICITY EVALUATION ---
+    // --- PROVENANCE & AUTHENTICITY EVALUATION ---
     if (c2pa?.is_signed) {
         addRule("C2PA Cryptographic Signature Present", 25, "Positive", "Authenticity");
         if (c2pa.status === "VALID") {
@@ -82,7 +80,7 @@ export const AssessmentEngine = {
         addRule("No Standard EXIF Data Found", -10, "Warning", "Provenance");
     }
 
-    // --- 4. STRUCTURAL CONSISTENCY EVALUATION (ViT & CV) ---
+    // --- STRUCTURAL CONSISTENCY EVALUATION (ViT & CV) ---
     if (prob !== null) {
         if (prob < 0.20) {
             addRule("ViT Inference: High Structural Integrity", 25, "Positive", "Structural");
@@ -92,7 +90,7 @@ export const AssessmentEngine = {
             addRule("ViT Inference: Inconclusive/Borderline", -5, "Neutral", "Structural");
         }
     } else {
-        addRule("Neural Inference Bypassed/Unavailable", 0, "Neutral", "Structural");
+        addRule("Neural Inference Unavailable (No Viable Subject)", 0, "Neutral", "Structural");
     }
 
     if (exif?.anomalies) {
@@ -107,15 +105,13 @@ export const AssessmentEngine = {
         }
     }
 
-    // 5. Clamp Score Between 0% and 100%
     const finalScore = Math.max(0, Math.min(100, score));
 
-    // --- 6. DETERMINE FORENSIC VERDICT ---
+    // --- DETERMINE FORENSIC VERDICT ---
     let verdict: any = 'UNVERIFIED';
     let type: 'trust' | 'neutral' | 'review' | 'crit' = 'neutral';
     let msg = "Insufficient Provenance";
     
-    // Logic Triggers
     const hasMajorContradiction = (authScore > 15 && structScore <= -15) || (c2pa?.is_signed && c2pa?.status === "VALID" && prob !== null && prob > 0.70);
     const lacksInformation = matrix.length <= 4 && !c2pa?.is_signed && prob === null;
 
