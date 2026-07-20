@@ -31,7 +31,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             const isActive = activeCase?.id === c.id;
             const caseEv = evidenceLibrary.filter(e => e.case_id === c.id);
             
-            // NEW 5-TIER STATS CALCULATION
+            // 5-TIER STATS CALCULATION
             const stats = caseEv.reduce((acc, ev) => {
               const { verdict } = AssessmentEngine.evaluate(ev);
               const platformStatus = ev.ai_report?.platform_status;
@@ -46,6 +46,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               } else if (verdict === 'INCONCLUSIVE') {
                 acc.inconclusive++;
               } else {
+               
                 // Catches UNVERIFIED, UNKNOWN, and standard/pending images
                 acc.unverified++;
               }
