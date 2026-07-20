@@ -3,7 +3,7 @@ import { Fingerprint, CheckCircle, Hash, Link2, Network, UploadCloud } from 'luc
 import type { Case } from '../types';
 import { EvidenceAPI } from '../services/api';
 
-// ADDED: useVit and useC2pa parameters to the component props
+// useVit and useC2pa parameters to the component props
 export const IngestionPipeline: React.FC<{ 
   file: File, 
   activeCase: Case, 
@@ -35,7 +35,7 @@ export const IngestionPipeline: React.FC<{
         await sleep(500);
         if (!isMounted) return;
         
-        // ADDED: Passing the boolean toggles down to the API function
+        // Passing the boolean toggles down to the API function
         await EvidenceAPI.uploadPayload(file, activeCase.id, activeCase.analyst, useVit, useC2pa);
         
         advance(5);
@@ -51,7 +51,7 @@ export const IngestionPipeline: React.FC<{
 
     executePipeline();
     return () => { isMounted = false; controller.abort(); };
-  }, [activeCase.id, activeCase.analyst, file, useVit, useC2pa]); // Added dependencies
+  }, [activeCase.id, activeCase.analyst, file, useVit, useC2pa]); 
 
   const steps = [
     { label: "INITIATING INGESTION PAYLOAD", icon: <UploadCloud size={16}/> },
