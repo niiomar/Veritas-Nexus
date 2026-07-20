@@ -505,6 +505,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                               ) : 'NO'}
                             </span>
                           </div>
+                          
                           {/* Advanced CV Flags */}
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <span style={{ color: 'var(--text-muted)' }}>Error Level Analysis (ELA)</span>
