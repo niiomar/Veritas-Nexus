@@ -368,90 +368,93 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
             
             {mainTab === 'MEDIA' && (
               <div style={{ display: 'flex', flexDirection: 'column', width: '100%', maxWidth: '1000px', margin: '0 auto', gap: '24px' }}>
-                {isVitUnavailable ? (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '400px', color: 'var(--text-muted)', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '8px', backgroundColor: 'rgba(255,255,255,0.01)' }}>
-                    <span className="mono">⚠ NEURAL INFERENCE UNAVAILABLE (NO SUBJECT DETECTED).</span>
-                  </div>
-                ) : (
-                  <div style={{ width: '100%', backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', overflow: 'hidden' }}>
-                    
-                    <div className="mono" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 32px', backgroundColor: '#111', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-                        <span style={{ fontSize: '11px', color: 'var(--text-main)', paddingRight: '12px', borderRight: '1px solid rgba(255,255,255,0.1)' }}>{Math.round(zoom * 100)}%</span>
-                        <button onClick={() => setZoom(z => Math.max(z - 0.25, 0.25))} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px' }} className="hover-bright"><ZoomOut size={14} /> OUT</button>
-                        <button onClick={() => setZoom(z => Math.min(z + 0.25, 4))} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px' }} className="hover-bright"><ZoomIn size={14} /> IN</button>
-                        <button onClick={() => setZoom(1)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px' }} className="hover-bright"><Maximize size={14} /> FIT</button>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                        <button onClick={() => setMainTab('RAW')} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px' }} className="hover-bright"><Info size={14} /> METADATA</button>
-                      </div>
+                <div style={{ width: '100%', backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', overflow: 'hidden' }}>
+                  
+                  <div className="mono" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 32px', backgroundColor: '#111', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+                      <span style={{ fontSize: '11px', color: 'var(--text-main)', paddingRight: '12px', borderRight: '1px solid rgba(255,255,255,0.1)' }}>{Math.round(zoom * 100)}%</span>
+                      <button onClick={() => setZoom(z => Math.max(z - 0.25, 0.25))} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px' }} className="hover-bright"><ZoomOut size={14} /> OUT</button>
+                      <button onClick={() => setZoom(z => Math.min(z + 0.25, 4))} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px' }} className="hover-bright"><ZoomIn size={14} /> IN</button>
+                      <button onClick={() => setZoom(1)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px' }} className="hover-bright"><Maximize size={14} /> FIT</button>
                     </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                      <button onClick={() => setMainTab('RAW')} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px' }} className="hover-bright"><Info size={14} /> METADATA</button>
+                    </div>
+                  </div>
 
-                    <div className="no-scrollbar" style={{ display: 'flex', gap: '16px', overflowX: 'auto', borderBottom: '1px solid rgba(255,255,255,0.05)', padding: '0 32px' }}>
-                      {['SOURCE', 'HEATMAP', 'PATCHES', 'ATTENTION'].map((tab) => (
+                  <div className="no-scrollbar" style={{ display: 'flex', gap: '16px', overflowX: 'auto', borderBottom: '1px solid rgba(255,255,255,0.05)', padding: '0 32px' }}>
+                    {['SOURCE', 'HEATMAP', 'PATCHES', 'ATTENTION'].map((tab) => (
+                      <button 
+                        key={tab} 
+                        onClick={() => { 
+                          setImageTab(tab as any); 
+                          if (imageFailed) setImageFailed(false);
+                        }}
+                        className="mono hover-bright"
+                        style={{ flex: '1 0 auto', padding: '20px 24px', background: 'transparent', border: 'none', borderBottom: imageTab === tab ? '2px solid #3b82f6' : '2px solid transparent', color: imageTab === tab ? 'var(--text-main)' : 'var(--text-muted)', fontSize: '11px', letterSpacing: '0.15em', cursor: 'pointer', transition: 'all 0.2s' }}
+                      >{tab}</button>
+                    ))}
+                  </div>
+
+                  <div style={{ width: '100%', height: '55vh', minHeight: '450px', backgroundColor: '#000', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                    
+                    {/* NEW CONDITIONAL RENDERING: Render Warning ONLY if trying to access neural tabs on a faceless image */}
+                    {imageTab !== 'SOURCE' && isVitUnavailable ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', zIndex: 10 }}>
+                        <div className="mono" style={{ color: 'var(--c-warn)', fontSize: '11px', letterSpacing: '0.15em' }}>⚠ ViT-CORE INFERENCE UNAVAILABLE</div>
+                        <div style={{ color: 'var(--text-muted)', fontSize: '11px', textAlign: 'center', maxWidth: '300px', lineHeight: 1.6 }}>
+                          The MTCNN preprocessing pipeline requires a viable human face to perform spatial deepfake analysis.
+                        </div>
+                      </div>
+                    ) : imageFailed ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', zIndex: 10 }}>
+                        <div className="mono" style={{ color: 'var(--c-crit)', fontSize: '11px', letterSpacing: '0.15em' }}>⚠ RENDER FAILED</div>
+                        <div style={{ color: 'var(--text-muted)', fontSize: '11px', textAlign: 'center', maxWidth: '300px' }}>
+                          The neural engine timed out or the browser cached a broken connection state.
+                        </div>
                         <button 
-                          key={tab} 
-                          onClick={() => { 
-                            setImageTab(tab as any); 
-                            if (imageFailed) setImageFailed(false);
+                          onClick={() => {
+                            setImageFailed(false);
+                            setImageTokens(prev => ({ ...prev, [imageTab]: Date.now() }));
                           }}
                           className="mono hover-bright"
-                          style={{ flex: '1 0 auto', padding: '20px 24px', background: 'transparent', border: 'none', borderBottom: imageTab === tab ? '2px solid #3b82f6' : '2px solid transparent', color: imageTab === tab ? 'var(--text-main)' : 'var(--text-muted)', fontSize: '11px', letterSpacing: '0.15em', cursor: 'pointer', transition: 'all 0.2s' }}
-                        >{tab}</button>
-                      ))}
-                    </div>
-
-                    <div style={{ width: '100%', height: '55vh', minHeight: '450px', backgroundColor: '#000', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                      {imageFailed ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', zIndex: 10 }}>
-                          <div className="mono" style={{ color: 'var(--c-crit)', fontSize: '11px', letterSpacing: '0.15em' }}>⚠ RENDER FAILED</div>
-                          <div style={{ color: 'var(--text-muted)', fontSize: '11px', textAlign: 'center', maxWidth: '300px' }}>
-                            The neural engine timed out or the browser cached a broken connection state.
-                          </div>
-                          <button 
-                            onClick={() => {
-                              setImageFailed(false);
-                              setImageTokens(prev => ({ ...prev, [imageTab]: Date.now() }));
-                            }}
-                            className="mono hover-bright"
-                            style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: 'var(--text-main)', padding: '6px 16px', fontSize: '10px', letterSpacing: '0.1em', cursor: 'pointer', borderRadius: '4px' }}
-                          >
-                            FORCE RETRY
-                          </button>
-                        </div>
-                      ) : (
-                        <div style={{ transform: `scale(${zoom})`, transformOrigin: 'center center', transition: 'transform 0.2s ease', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <img src={getImageUrl(imageTab)} alt={`Forensic ${imageTab}`} className="animate-fade-in" style={{ width: '100%', height: '100%', objectFit: 'contain' }} onError={() => setImageFailed(true)} onLoad={() => setImageFailed(false)} />
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="mono" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', padding: '24px 32px', fontSize: '11px', color: 'var(--text-faint)', letterSpacing: '0.05em', background: 'rgba(255,255,255,0.02)', gap: '24px' }}>
-                      <div>
-                        <div style={{marginBottom: '8px'}}>HEATMAP INTENSITY</div>
-                        <div style={{ position: 'relative', height: '4px', width: '100%', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '2px' }}>
-                          <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, right: 0, background: 'linear-gradient(90deg, #3b82f6 0%, #10b981 40%, #f59e0b 70%, #ef4444 100%)', borderRadius: '2px', opacity: 0.8 }}></div>
-                          {typeof vitProb === 'number' && <div style={{ position: 'absolute', left: `${vitProb * 100}%`, top: '-4px', bottom: '-4px', width: '2px', backgroundColor: '#fff', boxShadow: '0 0 4px rgba(255,255,255,0.8)' }}></div>}
-                        </div>
+                          style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: 'var(--text-main)', padding: '6px 16px', fontSize: '10px', letterSpacing: '0.1em', cursor: 'pointer', borderRadius: '4px' }}
+                        >
+                          FORCE RETRY
+                        </button>
                       </div>
-                      <div>
-                        <div style={{marginBottom: '4px'}}>INFERENCE CONFIDENCE</div>
-                        <div style={{color: 'var(--text-main)', fontSize: '13px'}}>{typeof vitProb === 'number' ? ((1 - vitProb) * 100).toFixed(1) : '--'}%</div>
+                    ) : (
+                      <div style={{ transform: `scale(${zoom})`, transformOrigin: 'center center', transition: 'transform 0.2s ease', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <img src={getImageUrl(imageTab)} alt={`Forensic ${imageTab}`} className="animate-fade-in" style={{ width: '100%', height: '100%', objectFit: 'contain' }} onError={() => setImageFailed(true)} onLoad={() => setImageFailed(false)} />
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <div className="mono" style={{ fontSize: '10px', color: 'var(--text-faint)', letterSpacing: '0.1em' }}>
-                          DETECTED ANOMALIES
-                        </div>
-                        <div className="mono" style={{ fontSize: '13px', color: anomalyColor, fontWeight: 600 }}>
-                          {anomalyText}
-                        </div>
-                        <div style={{ fontSize: '9px', color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'none' }}>
-                          {anomalyCount > 0 ? 'Review heatmap for localization' : 'No localized threats found'}
-                        </div>
+                    )}
+                  </div>
+                  
+                  <div className="mono" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', padding: '24px 32px', fontSize: '11px', color: 'var(--text-faint)', letterSpacing: '0.05em', background: 'rgba(255,255,255,0.02)', gap: '24px' }}>
+                    <div>
+                      <div style={{marginBottom: '8px'}}>HEATMAP INTENSITY</div>
+                      <div style={{ position: 'relative', height: '4px', width: '100%', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '2px' }}>
+                        {!isVitUnavailable && <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, right: 0, background: 'linear-gradient(90deg, #3b82f6 0%, #10b981 40%, #f59e0b 70%, #ef4444 100%)', borderRadius: '2px', opacity: 0.8 }}></div>}
+                        {typeof vitProb === 'number' && <div style={{ position: 'absolute', left: `${vitProb * 100}%`, top: '-4px', bottom: '-4px', width: '2px', backgroundColor: '#fff', boxShadow: '0 0 4px rgba(255,255,255,0.8)' }}></div>}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{marginBottom: '4px'}}>INFERENCE CONFIDENCE</div>
+                      <div style={{color: 'var(--text-main)', fontSize: '13px'}}>{typeof vitProb === 'number' ? ((1 - vitProb) * 100).toFixed(1) : '--'}%</div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div className="mono" style={{ fontSize: '10px', color: 'var(--text-faint)', letterSpacing: '0.1em' }}>
+                        DETECTED ANOMALIES
+                      </div>
+                      <div className="mono" style={{ fontSize: '13px', color: isVitUnavailable ? 'var(--text-muted)' : anomalyColor, fontWeight: 600 }}>
+                        {isVitUnavailable ? 'N/A' : anomalyText}
+                      </div>
+                      <div style={{ fontSize: '9px', color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'none' }}>
+                        {isVitUnavailable ? 'Facial recognition prerequisite not met' : (anomalyCount > 0 ? 'Review heatmap for localization' : 'No localized threats found')}
                       </div>
                     </div>
                   </div>
-                )}
+                </div>
               </div>
             )}
 
