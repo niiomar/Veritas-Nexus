@@ -42,7 +42,6 @@ class CreateCaseUseCase:
 
         return case.case_id
 
-
 class CloseCaseUseCase:
     def __init__(self, uow: IUnitOfWork, clock: IClock):
         self.uow = uow
