@@ -4,10 +4,8 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
-
 def _now() -> datetime:
     return datetime.now(timezone.utc)
-
 
 # Enums
 class CasePriority(str, Enum):
@@ -16,13 +14,11 @@ class CasePriority(str, Enum):
     HIGH = "HIGH"
     CRITICAL = "CRITICAL"
 
-
 class CaseStatus(str, Enum):
     OPEN = "OPEN"
     IN_PROGRESS = "IN_PROGRESS"
     CLOSED = "CLOSED"
     ARCHIVED = "ARCHIVED"
-
 
 class AnalysisStatus(str, Enum):
     PENDING = "PENDING"
@@ -31,13 +27,11 @@ class AnalysisStatus(str, Enum):
     FAILED = "FAILED"
     TIMEOUT = "TIMEOUT"
 
-
 class TrustLevel(str, Enum):
     HIGH = "HIGH"
     MODERATE = "MODERATE"
     LOW = "LOW"
     UNKNOWN = "UNKNOWN"
-
 
 class Disposition(str, Enum):
     APPROVED = "APPROVED"
@@ -45,20 +39,17 @@ class Disposition(str, Enum):
     ESCALATE = "ESCALATE"
     MANUAL_REVIEW = "MANUAL_REVIEW"
 
-
 class EngineId(str, Enum):
     VIT_CORE = "VIT_CORE"
     C2PA = "C2PA"
     AUDIO = "AUDIO"
     OCR = "OCR"
 
-
 class JobStatus(str, Enum):
     QUEUED = "QUEUED"
     RUNNING = "RUNNING"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
-
 
 # Entities
 @dataclass(slots=True)
@@ -74,7 +65,6 @@ class Case:
     updated_at: datetime = field(default_factory=_now)
     tags: List[str] = field(default_factory=list)
     evidence_ids: List[UUID] = field(default_factory=list)
-
 
 @dataclass(slots=True)
 class Evidence:
@@ -92,7 +82,6 @@ class Evidence:
     labels: List[str] = field(default_factory=list)
     current_assessment_id: Optional[UUID] = None
 
-
 @dataclass(slots=True)
 class AnalysisJob:
     job_id: UUID = field(default_factory=uuid4)
@@ -106,7 +95,6 @@ class AnalysisJob:
     finished_at: Optional[datetime] = None
     retry_count: int = 0
     failure_reason: Optional[str] = None
-
 
 @dataclass(slots=True)
 class EngineManifest:
@@ -123,7 +111,6 @@ class EngineManifest:
     supported_media: List[str] = field(default_factory=list)
     supported_features: List[str] = field(default_factory=list)
 
-
 @dataclass(slots=True, frozen=True)
 class AnalysisRun:
     analysis_id: UUID = field(default_factory=uuid4)
@@ -138,7 +125,6 @@ class AnalysisRun:
     payload: Dict[str, Any] = field(default_factory=dict)
     warnings: List[str] = field(default_factory=list)
     errors: List[str] = field(default_factory=list)
-
 
 @dataclass(slots=True, frozen=True)
 class AuthenticityAssessment:
@@ -156,7 +142,6 @@ class AuthenticityAssessment:
     evidence_sources: List[str] = field(default_factory=list)
     related_analysis_runs: List[UUID] = field(default_factory=list)
 
-
 @dataclass(slots=True, frozen=True)
 class Report:
     report_id: UUID = field(default_factory=uuid4)
@@ -167,7 +152,6 @@ class Report:
     generated_by: str = ""
     storage_uri: str = ""
     sha256: str = ""
-
 
 @dataclass(slots=True, frozen=True)
 class AuditEvent:
