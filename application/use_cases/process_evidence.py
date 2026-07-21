@@ -15,7 +15,6 @@ class IEngineOrchestrator:
 class ICorrelationOrchestrator:
     def synthesize(self, graph: EvidenceGraph) -> tuple: pass
 
-
 class ProcessEvidenceUseCase:
     def __init__(
         self,
