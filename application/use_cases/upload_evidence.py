@@ -8,7 +8,6 @@ from application.ports.unit_of_work import IUnitOfWork
 from application.ports.services import IStorageService, IHashService, IClock
 from application.ports.events import IEventDispatcher
 
-
 class UploadEvidenceUseCase:
     def __init__(
         self,
