@@ -4,7 +4,6 @@ from uuid import UUID
 
 from domain.models import AnalysisRun, EngineId, EngineManifest
 
-
 class IAnalysisEngine(ABC):
     """
     The strict interface for all Veritas Nexus analysis plugins.
@@ -16,7 +15,6 @@ class IAnalysisEngine(ABC):
     def engine_id(self) -> EngineId:
         """Returns the unique Enum identifier for this engine."""
         pass
-
     
     @property
     @abstractmethod
