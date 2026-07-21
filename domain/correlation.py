@@ -6,10 +6,8 @@ from uuid import UUID, uuid4
 
 from domain.models import Evidence, AnalysisRun, AuthenticityAssessment, AuditEvent
 
-
 def _now() -> datetime:
     return datetime.now(timezone.utc)
-
 
 class FindingCategory(str, Enum):
     PROVENANCE = "PROVENANCE"
@@ -17,7 +15,6 @@ class FindingCategory(str, Enum):
     METADATA_ANOMALY = "METADATA_ANOMALY"
     BIOMETRIC_MISMATCH = "BIOMETRIC_MISMATCH"
     STEGANOGRAPHY = "STEGANOGRAPHY"
-
 
 class FindingSubtype(str, Enum):
     FACE_SWAP = "FACE_SWAP"
@@ -28,12 +25,10 @@ class FindingSubtype(str, Enum):
     EDITING_SOFTWARE_DETECTED = "EDITING_SOFTWARE_DETECTED"
     GENERIC_MANIPULATION = "GENERIC_MANIPULATION"
 
-
 class FindingSeverity(str, Enum):
     INFO = "INFO"
     WARNING = "WARNING"
     CRITICAL = "CRITICAL"
-
 
 @dataclass(slots=True, frozen=True)
 class Finding:
@@ -60,7 +55,6 @@ class Finding:
     references: List[str] = field(default_factory=list) 
     
     created_at: datetime = field(default_factory=_now)
-
 
 @dataclass(slots=True)
 class EvidenceGraph:
