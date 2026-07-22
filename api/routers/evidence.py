@@ -29,7 +29,6 @@ STORAGE_VAULT = Path("/vault")
 
 # Read microservice credentials
 VIT_CORE_URL = os.getenv("VIT_CORE_URL", "http://host.docker.internal:8001/api/v1/analyze")
-# UPDATED: Replaced the incorrect C2PA token with the correct ViT-CORE token
 VIT_CORE_API_KEY = os.getenv("VIT_CORE_API_KEY", "vitcore_forensics_secure_token_2026")
 
 
@@ -117,7 +116,7 @@ async def ingest_evidence(
 @router.get("/")
 async def list_evidence(db: AsyncSession = Depends(get_db)):
     try:
-        # ADDED: e.metadata_dict to the SQL SELECT query
+        # e.metadata_dict to the SQL SELECT query
         stmt = text("""
             SELECT e.id, e.case_id, e.original_filename, e.sha256, e.uploaded_at, e.metadata_dict, j.status, j.ai_report
             FROM core.evidence e
@@ -209,12 +208,8 @@ def fetch_visual_from_microservice(file_path: str, visual_type: str) -> bytes:
         raise RuntimeError(f"Network error communicating with ViT-CORE: {str(e)}")
     except Exception as e:
         raise RuntimeError(f"Proxy decoding failed: {repr(e)}")
-
-
-# ---------------------------------------------------------
+        
 # DYNAMIC PROXY ROUTER HANDLERS
-# ---------------------------------------------------------
-
 async def _proxy_visual(evidence_id: uuid.UUID, visual_type: str, db: AsyncSession):
     """Core logic to fetch physical file paths and route them to the ViT microservice."""
     try:
