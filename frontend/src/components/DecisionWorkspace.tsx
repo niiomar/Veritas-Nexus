@@ -34,7 +34,7 @@ const syntaxHighlight = (json: any) => {
 };
 
 const getNodeStyle = (action: string) => {
-  const act = (action || '').toLowerCase(); // Fortified against null
+  const act = (action || '').toLowerCase();
   if (act.includes('origin') || act.includes('created')) return { color: '#eab308', Icon: Disc }; 
   if (act.includes('convert') || act.includes('edit') || act.includes('unbound')) return { color: '#8b5cf6', Icon: Edit2 }; 
   if (act.includes('sign')) return { color: '#38bdf8', Icon: Lock }; 
@@ -54,7 +54,6 @@ const formatTimeNodes = (ts: string | undefined | null) => {
   );
 };
 
-// Fortified caseEvidence to default to an empty array to prevent .filter() crashes
 export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Evidence[], onClose: () => void }> = ({ evidence, caseEvidence = [], onClose }) => {
   const assessment = useMemo(() => evidence ? AssessmentEngine.evaluate(evidence) : { type: 'review', conf: 'N/A', verdict: 'UNKNOWN', msg: 'Pending' }, [evidence]);
   const detailedAssessment = assessment as any; 
@@ -72,13 +71,23 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
   const isC2paBroken = c2pa?.status === "BROKEN_SIGNATURE";
   
   // --- SYNCHRONIZED DOSSIER THEME LOGIC ---
+  // 1. Determine the ultimate verdict string first
+  const finalVerdict = platformStatus === 'CONFLICT' ? 'CONFLICT' : 
+                       platformStatus === 'CRITICAL THREAT' ? 'CRITICAL' : 
+                       (assessment.verdict?.toUpperCase() || 'PENDING');
+
+  // 2. Map the precise theme color based on the strict verdict
   let themeColor = '';
-  if (assessment.type === 'crit' || platformStatus === 'CRITICAL THREAT' || isC2paBroken) {
+  if (finalVerdict === 'CRITICAL' || isC2paBroken) {
     themeColor = 'var(--c-crit, #ef4444)'; // Red
-  } else if (platformStatus === 'CONFLICT' || assessment.type === 'review') {
+  } else if (finalVerdict === 'CONFLICT') {
     themeColor = 'var(--c-warn, #f59e0b)'; // Orange
-  } else if (platformStatus === 'UNVERIFIED' || assessment.verdict === 'UNKNOWN' || assessment.verdict === 'INCONCLUSIVE' || assessment.type === 'neutral') {
-    themeColor = 'var(--text-muted, #94a3b8)'; // Grey (Matches sidebar)
+  } else if (finalVerdict === 'INCONCLUSIVE') {
+    themeColor = '#64748b'; // Dimmed Slate (Matches sidebar perfectly)
+  } else if (finalVerdict === 'UNVERIFIED' || finalVerdict === 'UNKNOWN') {
+    themeColor = 'var(--text-muted, #94a3b8)'; // Lighter Grey
+  } else if (assessment.type === 'review') {
+    themeColor = 'var(--c-warn, #f59e0b)'; // Generic review fallback
   } else {
     themeColor = 'var(--c-trust, #10b981)'; // Green
   }
@@ -90,20 +99,16 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
     dispositionText = dispositionText.replace('bypassed/offline', 'unavailable (no viable subject)');
   }
   
-  // NEW: Smart Universal Prefix Stripper
-  // Removes ANY "ALL CAPS - " prefix from the backend so the subtext doesn't repeat the header
+  // Smart Universal Prefix Stripper
   if (dispositionText.includes(' - ')) {
     const parts = dispositionText.split(' - ');
-    // Check if the prefix is entirely uppercase (e.g., "CONFLICT", "CRITICAL CONFLICT", "UNKNOWN")
     if (parts[0] === parts[0].toUpperCase()) {
-      // Re-join the rest in case there were multiple hyphens in the sentence
       dispositionText = parts.slice(1).join(' - ');
-      // Capitalize the first letter for clean grammar
       dispositionText = dispositionText.charAt(0).toUpperCase() + dispositionText.slice(1);
     }
   }
 
-  // Final manual refinement for the edge case "unknown" text
+  // Final manual refinement for the edge case text
   if (dispositionText === 'No signature found and Neural Engine unavailable (no viable subject).') {
     dispositionText = 'No cryptographic signature found; neural inference unavailable (no viable subject).';
   }
@@ -186,7 +191,6 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
   const anomalyText = anomalyCount > 0 ? `${anomalyCount} SUSPICIOUS AREA${anomalyCount > 1 ? 'S' : ''}` : 'NONE DETECTED';
   const anomalyColor = anomalyCount > 0 ? 'var(--c-crit)' : 'var(--text-main)';
 
-  // Fortified: Safely extracting strings so map/filter don't crash
   const evidenceUploadedDate = evidence?.uploaded_at ? evidence.uploaded_at.split('T')[0] : null;
 
   const sameIssuer = caseEvidence?.filter(e => e?.id !== evidence?.id && e?.ai_report?.c2pa_data?.issuer === c2pa?.issuer && c2pa?.issuer && e?.ai_report?.c2pa_data?.is_signed) || [];
@@ -195,7 +199,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
     return e.id !== evidence?.id && e.uploaded_at.split('T')[0] === evidenceUploadedDate;
   }) || [];
 
-  if (!evidence) return null; // Safety net for early mounting
+  if (!evidence) return null;
 
   return (
     <div className="decision-workspace" style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', backgroundColor: '#050505', position: 'relative' }}>
@@ -220,16 +224,12 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
                 <span style={{ color: themeColor }}>████</span> EVIDENCE ASSESSMENT
               </div>
               
-              {/* FORCE THE DOSSIER HEADER TO MATCH THE SIDEBAR STATUS */}
               <div style={{ fontSize: '24px', fontWeight: 800, color: themeColor, letterSpacing: '-0.02em', marginBottom: '4px' }}>
-                {platformStatus === 'CONFLICT' ? 'CONFLICT' : 
-                 platformStatus === 'CRITICAL THREAT' ? 'CRITICAL' : 
-                 (assessment.verdict?.toUpperCase() || 'PENDING')}
+                {finalVerdict}
               </div>
               
               <div style={{ fontSize: '13px', color: 'var(--text-main)' }}>
-                {/* Always use the newly stripped dispositionText, removing repetitive AssessmentEngine.msg for these complex statuses */}
-                {platformStatus === 'CONFLICT' || platformStatus === 'CRITICAL THREAT' || isC2paBypassed || isVitUnavailable 
+                {platformStatus === 'CONFLICT' || platformStatus === 'CRITICAL THREAT' || isC2paBypassed || isVitUnavailable || finalVerdict === 'INCONCLUSIVE'
                   ? dispositionText 
                   : `${assessment.msg} — ${dispositionText}`}
               </div>
@@ -439,7 +439,6 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
 
                   <div style={{ width: '100%', height: '55vh', minHeight: '450px', backgroundColor: '#000', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                     
-                    {/* NEW CONDITIONAL RENDERING: Render Warning ONLY if trying to access neural tabs on a faceless image */}
                     {imageTab !== 'SOURCE' && isVitUnavailable ? (
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', zIndex: 10 }}>
                         <div className="mono" style={{ color: 'var(--c-warn)', fontSize: '11px', letterSpacing: '0.15em' }}>⚠ ViT-CORE INFERENCE UNAVAILABLE</div>
