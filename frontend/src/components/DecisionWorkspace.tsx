@@ -71,19 +71,17 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
   const isC2paBroken = c2pa?.status === "BROKEN_SIGNATURE";
   
   // --- SYNCHRONIZED DOSSIER THEME LOGIC ---
-  // 1. Determine the ultimate verdict string first
   const finalVerdict = platformStatus === 'CONFLICT' ? 'CONFLICT' : 
                        platformStatus === 'CRITICAL THREAT' ? 'CRITICAL' : 
                        (assessment.verdict?.toUpperCase() || 'PENDING');
 
-  // 2. Map the precise theme color based on the strict verdict
   let themeColor = '';
   if (finalVerdict === 'CRITICAL' || isC2paBroken) {
     themeColor = 'var(--c-crit, #ef4444)'; // Red
   } else if (finalVerdict === 'CONFLICT') {
     themeColor = 'var(--c-warn, #f59e0b)'; // Orange
   } else if (finalVerdict === 'INCONCLUSIVE') {
-    themeColor = '#64748b'; // Dimmed Slate (Matches sidebar perfectly)
+    themeColor = '#64748b'; // Dimmed Slate
   } else if (finalVerdict === 'UNVERIFIED' || finalVerdict === 'UNKNOWN') {
     themeColor = 'var(--text-muted, #94a3b8)'; // Lighter Grey
   } else if (assessment.type === 'review') {
@@ -108,9 +106,19 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
     }
   }
 
-  // Final manual refinement for the edge case text
   if (dispositionText === 'No signature found and Neural Engine unavailable (no viable subject).') {
     dispositionText = 'No cryptographic signature found; neural inference unavailable (no viable subject).';
+  }
+
+  // --- DYNAMIC SUBTEXT FORMATTER ---
+  // Completely overrides the generic AssessmentEngine.msg for specific verdicts to ensure clinical clarity
+  let finalSubtext = `${assessment.msg} — ${dispositionText}`;
+  if (platformStatus === 'CONFLICT' || platformStatus === 'CRITICAL THREAT') {
+    finalSubtext = dispositionText;
+  } else if (finalVerdict === 'CRITICAL') {
+    finalSubtext = `Severe structural manipulation and metadata degradation detected. ${dispositionText}`;
+  } else if (finalVerdict === 'INCONCLUSIVE') {
+    finalSubtext = `Forensic markers fall below definitive trust threshold. ${dispositionText}`;
   }
 
   // --- GAUGE CALCULATIONS ---
@@ -229,9 +237,8 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
               </div>
               
               <div style={{ fontSize: '13px', color: 'var(--text-main)' }}>
-                {platformStatus === 'CONFLICT' || platformStatus === 'CRITICAL THREAT' || isC2paBypassed || isVitUnavailable || finalVerdict === 'INCONCLUSIVE'
-                  ? dispositionText 
-                  : `${assessment.msg} — ${dispositionText}`}
+                {/* Dynamically formulated subtext renders here */}
+                {finalSubtext}
               </div>
             </div>
             
