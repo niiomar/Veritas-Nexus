@@ -83,7 +83,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
   } else if (finalVerdict === 'INCONCLUSIVE') {
     themeColor = '#64748b'; // Dimmed Slate
   } else if (finalVerdict === 'UNVERIFIED' || finalVerdict === 'UNKNOWN') {
-    themeColor = 'var(--text-muted, #94a3b8)'; // Lighter Grey
+    themeColor = '#cbd5e1'; // Stronger, brighter silver for Unverified
   } else if (assessment.type === 'review') {
     themeColor = 'var(--c-warn, #f59e0b)'; // Generic review fallback
   } else {
@@ -97,7 +97,6 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
     dispositionText = dispositionText.replace('bypassed/offline', 'unavailable (no viable subject)');
   }
   
-  // Smart Universal Prefix Stripper
   if (dispositionText.includes(' - ')) {
     const parts = dispositionText.split(' - ');
     if (parts[0] === parts[0].toUpperCase()) {
@@ -111,7 +110,6 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
   }
 
   // --- DYNAMIC SUBTEXT FORMATTER ---
-  // Completely overrides the generic AssessmentEngine.msg for specific verdicts to ensure clinical clarity
   let finalSubtext = `${assessment.msg} — ${dispositionText}`;
   if (platformStatus === 'CONFLICT' || platformStatus === 'CRITICAL THREAT') {
     finalSubtext = dispositionText;
@@ -119,6 +117,13 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
     finalSubtext = `Severe structural manipulation and metadata degradation detected. ${dispositionText}`;
   } else if (finalVerdict === 'INCONCLUSIVE') {
     finalSubtext = `Forensic markers fall below definitive trust threshold. ${dispositionText}`;
+  } else if (finalVerdict === 'UNVERIFIED') {
+    // New rewrite to remove redundancy and sound highly professional
+    if (dispositionText.toLowerCase().includes('analysis clean')) {
+      finalSubtext = `Neural evaluation is nominal, but the absence of a cryptographic signature prevents definitive authentication.`;
+    } else {
+      finalSubtext = `Authentication Pending — ${dispositionText}`;
+    }
   }
 
   // --- GAUGE CALCULATIONS ---
@@ -237,7 +242,6 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
               </div>
               
               <div style={{ fontSize: '13px', color: 'var(--text-main)' }}>
-                {/* Dynamically formulated subtext renders here */}
                 {finalSubtext}
               </div>
             </div>
