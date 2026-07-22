@@ -369,7 +369,7 @@ export default function App() {
                           const platformStatus = item.ai_report?.platform_status;
                           const c2paStatus = item.ai_report?.c2pa_data?.status;
 
-                          let statusHex = '#cbd5e1'; // Brighter Silver/Slate for Unverified
+                          let statusHex = '#cbd5e1'; // Brighter Silver
                           if (ast.verdict === 'CRITICAL' || platformStatus === 'CRITICAL THREAT' || c2paStatus === 'BROKEN_SIGNATURE') {
                             statusHex = '#ef4444'; // Red
                           } else if (ast.verdict === 'CONFLICT' || platformStatus === 'CONFLICT') {
