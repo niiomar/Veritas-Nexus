@@ -70,7 +70,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
   const isC2paBypassed = c2pa?.raw_status === "Bypassed by User";
   const isC2paBroken = c2pa?.status === "BROKEN_SIGNATURE";
   
-  // --- SYNCHRONIZED DOSSIER THEME LOGIC ---
+  // SYNCHRONIZED DOSSIER THEME LOGIC
   const finalVerdict = platformStatus === 'CONFLICT' ? 'CONFLICT' : 
                        platformStatus === 'CRITICAL THREAT' ? 'CRITICAL' : 
                        (assessment.verdict?.toUpperCase() || 'PENDING');
@@ -83,14 +83,14 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
   } else if (finalVerdict === 'INCONCLUSIVE') {
     themeColor = '#64748b'; // Dimmed Slate
   } else if (finalVerdict === 'UNVERIFIED' || finalVerdict === 'UNKNOWN') {
-    themeColor = '#cbd5e1'; // Stronger, brighter silver for Unverified
+    themeColor = '#cbd5e1'; // Brighter silver
   } else if (assessment.type === 'review') {
     themeColor = 'var(--c-warn, #f59e0b)'; // Generic review fallback
   } else {
     themeColor = 'var(--c-trust, #10b981)'; // Green
   }
 
-  // --- OVERRIDE BACKEND DISPOSITION STRING ---
+  // OVERRIDE BACKEND DISPOSITION STRING 
   let dispositionText = evidence?.ai_report?.disposition || 'Analysis complete.';
   
   if (dispositionText.includes('bypassed/offline')) {
@@ -109,7 +109,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
     dispositionText = 'No cryptographic signature found; neural inference unavailable (no viable subject).';
   }
 
-  // --- DYNAMIC SUBTEXT FORMATTER ---
+  // DYNAMIC SUBTEXT FORMATTER
   let finalSubtext = `${assessment.msg} — ${dispositionText}`;
   if (platformStatus === 'CONFLICT' || platformStatus === 'CRITICAL THREAT') {
     finalSubtext = dispositionText;
@@ -118,7 +118,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
   } else if (finalVerdict === 'INCONCLUSIVE') {
     finalSubtext = `Forensic markers fall below definitive trust threshold. ${dispositionText}`;
   } else if (finalVerdict === 'UNVERIFIED') {
-    // New rewrite to remove redundancy and sound highly professional
+    
     if (dispositionText.toLowerCase().includes('analysis clean')) {
       finalSubtext = `Neural evaluation is nominal, but the absence of a cryptographic signature prevents definitive authentication.`;
     } else {
@@ -126,13 +126,13 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
     }
   }
 
-  // --- GAUGE CALCULATIONS ---
+  // GAUGE CALCULATIONS
   const confValue = assessment.conf !== 'N/A' ? parseFloat(assessment.conf) : 0;
   const gaugeRadius = 13;
   const gaugeCircumference = 2 * Math.PI * gaugeRadius;
   const gaugeOffset = gaugeCircumference - (confValue / 100) * gaugeCircumference;
 
-  // --- TIMELINE FORENSIC REASONING CALCULATIONS ---
+  // TIMELINE FORENSIC REASONING CALCULATIONS
   const parseExifDate = (dateStr: string) => {
     if (!dateStr) return null;
     const normalized = dateStr.replace(/^(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3');
@@ -705,7 +705,8 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
                     <div className="no-scrollbar" style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', padding: '0 48px', overflowX: 'auto' }}>
                       <div style={{ position: 'absolute', top: '24px', left: '48px', right: '48px', height: '2px', backgroundColor: 'rgba(255,255,255,0.1)', zIndex: 0 }}></div>
                       {history.map((node, i) => {
-                        // Fortified against missing actions in JSON payload
+                        
+                      // Fortified against missing actions in JSON payload
                         const actionString = node?.action ? String(node.action) : 'EVENT';
                         const { color, Icon } = getNodeStyle(actionString);
                         
