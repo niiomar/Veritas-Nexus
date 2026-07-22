@@ -88,6 +88,17 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
   if (dispositionText.includes('bypassed/offline')) {
     dispositionText = dispositionText.replace('bypassed/offline', 'unavailable (no viable subject)');
   }
+  
+  // Apply Option 2 phrasing by stripping the "UNKNOWN" prefix and refining the punctuation
+  if (dispositionText.startsWith('UNKNOWN - ')) {
+    dispositionText = dispositionText.replace('UNKNOWN - ', '');
+    
+    if (dispositionText === 'No signature found and Neural Engine unavailable (no viable subject).') {
+      dispositionText = 'No cryptographic signature found; neural inference unavailable (no viable subject).';
+    } else {
+      dispositionText = dispositionText.charAt(0).toUpperCase() + dispositionText.slice(1);
+    }
+  }
 
   // --- GAUGE CALCULATIONS ---
   const confValue = assessment.conf !== 'N/A' ? parseFloat(assessment.conf) : 0;
