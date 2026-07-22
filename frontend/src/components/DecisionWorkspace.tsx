@@ -85,19 +85,27 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
 
   // --- OVERRIDE BACKEND DISPOSITION STRING ---
   let dispositionText = evidence?.ai_report?.disposition || 'Analysis complete.';
+  
   if (dispositionText.includes('bypassed/offline')) {
     dispositionText = dispositionText.replace('bypassed/offline', 'unavailable (no viable subject)');
   }
   
-  // Apply Option 2 phrasing by stripping the "UNKNOWN" prefix and refining the punctuation
-  if (dispositionText.startsWith('UNKNOWN - ')) {
-    dispositionText = dispositionText.replace('UNKNOWN - ', '');
-    
-    if (dispositionText === 'No signature found and Neural Engine unavailable (no viable subject).') {
-      dispositionText = 'No cryptographic signature found; neural inference unavailable (no viable subject).';
-    } else {
+  // NEW: Smart Universal Prefix Stripper
+  // Removes ANY "ALL CAPS - " prefix from the backend so the subtext doesn't repeat the header
+  if (dispositionText.includes(' - ')) {
+    const parts = dispositionText.split(' - ');
+    // Check if the prefix is entirely uppercase (e.g., "CONFLICT", "CRITICAL CONFLICT", "UNKNOWN")
+    if (parts[0] === parts[0].toUpperCase()) {
+      // Re-join the rest in case there were multiple hyphens in the sentence
+      dispositionText = parts.slice(1).join(' - ');
+      // Capitalize the first letter for clean grammar
       dispositionText = dispositionText.charAt(0).toUpperCase() + dispositionText.slice(1);
     }
+  }
+
+  // Final manual refinement for the edge case "unknown" text
+  if (dispositionText === 'No signature found and Neural Engine unavailable (no viable subject).') {
+    dispositionText = 'No cryptographic signature found; neural inference unavailable (no viable subject).';
   }
 
   // --- GAUGE CALCULATIONS ---
@@ -220,8 +228,10 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
               </div>
               
               <div style={{ fontSize: '13px', color: 'var(--text-main)' }}>
-                {/* Clean up the subtext slightly to prevent repeating the word 'Conflict' if the backend disposition already includes it */}
-                {platformStatus === 'CONFLICT' ? dispositionText : `${assessment.msg} — ${dispositionText}`}
+                {/* Always use the newly stripped dispositionText, removing repetitive AssessmentEngine.msg for these complex statuses */}
+                {platformStatus === 'CONFLICT' || platformStatus === 'CRITICAL THREAT' || isC2paBypassed || isVitUnavailable 
+                  ? dispositionText 
+                  : `${assessment.msg} — ${dispositionText}`}
               </div>
             </div>
             
