@@ -31,7 +31,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             const isActive = activeCase?.id === c.id;
             const caseEv = evidenceLibrary.filter(e => e.case_id === c.id);
             
-            // 5-TIER STATS CALCULATION
+            // NEW 5-TIER STATS CALCULATION
             const stats = caseEv.reduce((acc, ev) => {
               const { verdict } = AssessmentEngine.evaluate(ev);
               const platformStatus = ev.ai_report?.platform_status;
@@ -46,7 +46,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               } else if (verdict === 'INCONCLUSIVE') {
                 acc.inconclusive++;
               } else {
-               
                 // Catches UNVERIFIED, UNKNOWN, and standard/pending images
                 acc.unverified++;
               }
@@ -86,7 +85,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </div>
                   
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: stats.unverified > 0 ? '#94a3b8' : 'rgba(255,255,255,0.1)' }}></div>
+                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: stats.unverified > 0 ? '#cbd5e1' : 'rgba(255,255,255,0.1)' }}></div>
                     <span style={{ color: 'var(--text-muted)' }}><span style={{color: stats.unverified > 0 ? 'var(--text-main)' : 'var(--text-faint)'}}>{stats.unverified}</span> Unverified</span>
                   </div>
 
