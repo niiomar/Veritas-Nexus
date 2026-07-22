@@ -35,11 +35,11 @@ const syntaxHighlight = (json: any) => {
 
 const getNodeStyle = (action: string) => {
   const act = action.toLowerCase();
-  if (act.includes('origin') || act.includes('created')) return { color: '#eab308', Icon: Disc, label: '📷 Created' }; 
-  if (act.includes('convert') || act.includes('edit') || act.includes('unbound')) return { color: '#8b5cf6', Icon: Edit2, label: '✏️ Edited' }; 
-  if (act.includes('sign')) return { color: '#38bdf8', Icon: Lock, label: '🔐 Signed' }; 
-  if (act.includes('verif')) return { color: '#22c55e', Icon: ShieldCheck, label: '✓ Verified' }; 
-  return { color: '#94a3b8', Icon: Circle, label: 'Event' }; 
+  if (act.includes('origin') || act.includes('created')) return { color: '#eab308', Icon: Disc }; 
+  if (act.includes('convert') || act.includes('edit') || act.includes('unbound')) return { color: '#8b5cf6', Icon: Edit2 }; 
+  if (act.includes('sign')) return { color: '#38bdf8', Icon: Lock }; 
+  if (act.includes('verif')) return { color: '#22c55e', Icon: ShieldCheck }; 
+  return { color: '#94a3b8', Icon: Circle }; 
 };
 
 const formatTimeNodes = (ts: string | undefined | null) => {
@@ -79,19 +79,19 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
     finalColorType = 'trust';
   }
 
-  // OVERRIDE BACKEND DISPOSITION STRING
+  // --- OVERRIDE BACKEND DISPOSITION STRING ---
   let dispositionText = evidence.ai_report?.disposition || 'Analysis complete.';
   if (dispositionText.includes('bypassed/offline')) {
     dispositionText = dispositionText.replace('bypassed/offline', 'unavailable (no viable subject)');
   }
 
-  // GAUGE CALCULATIONS
+  // --- GAUGE CALCULATIONS ---
   const confValue = assessment.conf !== 'N/A' ? parseFloat(assessment.conf) : 0;
   const gaugeRadius = 13;
   const gaugeCircumference = 2 * Math.PI * gaugeRadius;
   const gaugeOffset = gaugeCircumference - (confValue / 100) * gaugeCircumference;
 
-  // TIMELINE FORENSIC REASONING CALCULATIONS
+  // --- TIMELINE FORENSIC REASONING CALCULATIONS ---
   const parseExifDate = (dateStr: string) => {
     if (!dateStr) return null;
     const normalized = dateStr.replace(/^(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3');
@@ -398,7 +398,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
 
                   <div style={{ width: '100%', height: '55vh', minHeight: '450px', backgroundColor: '#000', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                     
-                    {/* Render Warning ONLY if trying to access neural tabs on a faceless image */}
+                    {/* NEW CONDITIONAL RENDERING: Render Warning ONLY if trying to access neural tabs on a faceless image */}
                     {imageTab !== 'SOURCE' && isVitUnavailable ? (
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', zIndex: 10 }}>
                         <div className="mono" style={{ color: 'var(--c-warn)', fontSize: '11px', letterSpacing: '0.15em' }}>⚠ ViT-CORE INFERENCE UNAVAILABLE</div>
@@ -505,7 +505,6 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                               ) : 'NO'}
                             </span>
                           </div>
-                          
                           {/* Advanced CV Flags */}
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <span style={{ color: 'var(--text-muted)' }}>Error Level Analysis (ELA)</span>
@@ -655,23 +654,23 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                     <div className="no-scrollbar" style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', padding: '0 48px', overflowX: 'auto' }}>
                       <div style={{ position: 'absolute', top: '24px', left: '48px', right: '48px', height: '2px', backgroundColor: 'rgba(255,255,255,0.1)', zIndex: 0 }}></div>
                       {history.map((node, i) => {
-                        const { color, Icon, label } = getNodeStyle(node.action);
+                        const { color, Icon } = getNodeStyle(node.action);
                         return (
                           <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 1, minWidth: '120px' }}>
                             <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#0a0a0c', border: `2px solid ${color}`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' }}>
                                <Icon size={20} color={color} />
                             </div>
                             <div className="mono" style={{ padding: '4px 10px', backgroundColor: '#000', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '4px', fontSize: '10px', color: '#fff', fontWeight: 600, letterSpacing: '0.05em', marginBottom: '8px' }}>
-                              {label.toUpperCase()}
+                              {node.action.toUpperCase()}
                             </div>
                             <div style={{ fontSize: '11px', color: 'var(--text-main)', textAlign: 'center', marginBottom: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', minHeight: '16px' }}>
-                              {node.agent && node.agent !== 'null' ? node.agent : 'Unknown System'}
+                              {node.agent && node.agent !== 'null' ? node.agent : 'Unknown'}
                             </div>
                             <div className="mono" style={{ fontSize: '10px', textAlign: 'center' }}>
                               {formatTimeNodes(node.timestamp)}
                             </div>
                           </div>
-                        )
+                        );
                       })}
                     </div>
                   )}
