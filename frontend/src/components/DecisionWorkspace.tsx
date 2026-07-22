@@ -34,7 +34,7 @@ const syntaxHighlight = (json: any) => {
 };
 
 const getNodeStyle = (action: string) => {
-  const act = action.toLowerCase();
+  const act = (action || '').toLowerCase(); // Fortified against null
   if (act.includes('origin') || act.includes('created')) return { color: '#eab308', Icon: Disc }; 
   if (act.includes('convert') || act.includes('edit') || act.includes('unbound')) return { color: '#8b5cf6', Icon: Edit2 }; 
   if (act.includes('sign')) return { color: '#38bdf8', Icon: Lock }; 
@@ -54,33 +54,37 @@ const formatTimeNodes = (ts: string | undefined | null) => {
   );
 };
 
-export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evidence[], onClose: () => void }> = ({ evidence, caseEvidence, onClose }) => {
-  const assessment = useMemo(() => AssessmentEngine.evaluate(evidence), [evidence]);
+// Fortified caseEvidence to default to an empty array to prevent .filter() crashes
+export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Evidence[], onClose: () => void }> = ({ evidence, caseEvidence = [], onClose }) => {
+  const assessment = useMemo(() => evidence ? AssessmentEngine.evaluate(evidence) : { type: 'review', conf: 'N/A', verdict: 'UNKNOWN', msg: 'Pending' }, [evidence]);
   const detailedAssessment = assessment as any; 
   
-  const isEval = evidence.status !== 'COMPLETED' || !evidence.ai_report;
-  const c2pa = evidence.ai_report?.c2pa_data;
-  const vitProb = evidence.ai_report?.deepfake_probability;
-  const platformStatus = evidence.ai_report?.platform_status;
+  const isEval = evidence?.status !== 'COMPLETED' || !evidence?.ai_report;
+  const c2pa = evidence?.ai_report?.c2pa_data;
+  const vitProb = evidence?.ai_report?.deepfake_probability;
+  const platformStatus = evidence?.ai_report?.platform_status;
   
   // @ts-ignore
-  const exif = evidence.metadata_dict?.exif;
+  const exif = evidence?.metadata_dict?.exif;
 
-  const isVitUnavailable = vitProb === null;
+  const isVitUnavailable = vitProb === null || vitProb === undefined;
   const isC2paBypassed = c2pa?.raw_status === "Bypassed by User";
   const isC2paBroken = c2pa?.status === "BROKEN_SIGNATURE";
   
-  let finalColorType = assessment.type;
+  // --- SYNCHRONIZED DOSSIER THEME LOGIC ---
+  let themeColor = '';
   if (assessment.type === 'crit' || platformStatus === 'CRITICAL THREAT' || isC2paBroken) {
-    finalColorType = 'crit';
-  } else if (platformStatus === 'UNVERIFIED' || assessment.type === 'review' || assessment.type === 'neutral' || assessment.verdict === 'UNKNOWN' || assessment.verdict === 'INCONCLUSIVE') {
-    finalColorType = 'review';
+    themeColor = 'var(--c-crit, #ef4444)'; // Red
+  } else if (platformStatus === 'CONFLICT' || assessment.type === 'review') {
+    themeColor = 'var(--c-warn, #f59e0b)'; // Orange
+  } else if (platformStatus === 'UNVERIFIED' || assessment.verdict === 'UNKNOWN' || assessment.verdict === 'INCONCLUSIVE' || assessment.type === 'neutral') {
+    themeColor = 'var(--text-muted, #94a3b8)'; // Grey (Matches sidebar)
   } else {
-    finalColorType = 'trust';
+    themeColor = 'var(--c-trust, #10b981)'; // Green
   }
 
   // --- OVERRIDE BACKEND DISPOSITION STRING ---
-  let dispositionText = evidence.ai_report?.disposition || 'Analysis complete.';
+  let dispositionText = evidence?.ai_report?.disposition || 'Analysis complete.';
   if (dispositionText.includes('bypassed/offline')) {
     dispositionText = dispositionText.replace('bypassed/offline', 'unavailable (no viable subject)');
   }
@@ -113,7 +117,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
 
   const history = c2pa?.manifest_history?.length 
     ? c2pa.manifest_history 
-    : [{ action: 'Origin', agent: 'Unknown Sensor/Software', timestamp: evidence.created_at || 'Unknown', description: 'Initial file creation' }];
+    : [{ action: 'Origin', agent: 'Unknown Sensor/Software', timestamp: evidence?.created_at || 'Unknown', description: 'Initial file creation' }];
 
   const [mainTab, setMainTab] = useState<'MEDIA' | 'METADATA' | 'PROVENANCE' | 'CREDENTIAL' | 'CORRELATION' | 'RAW'>('MEDIA');
   const [imageTab, setImageTab] = useState<'SOURCE' | 'HEATMAP' | 'PATCHES' | 'ATTENTION'>('SOURCE');
@@ -135,16 +139,17 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
 
   useEffect(() => {
     setZoom(1);
-  }, [evidence.id, imageTab]);
+  }, [evidence?.id, imageTab]);
 
   const getImageUrl = useCallback((tab: string) => {
+    if (!evidence?.id) return '';
     const token = imageTokens[tab] || viewSession;
     const qs = `?v=${token}`;
     if (tab === 'HEATMAP') return `${API_BASE_URL}/api/v1/evidence/${evidence.id}/heatmap${qs}`;
     if (tab === 'PATCHES') return `${API_BASE_URL}/api/v1/evidence/${evidence.id}/patches${qs}`;
     if (tab === 'ATTENTION') return `${API_BASE_URL}/api/v1/evidence/${evidence.id}/attention${qs}`;
     return `${API_BASE_URL}/api/v1/evidence/${evidence.id}/download${qs}`; 
-  }, [evidence.id, viewSession, imageTokens]);
+  }, [evidence?.id, viewSession, imageTokens]);
 
   const handleCopy = (type: 'C2PA' | 'VIT', data: any) => {
     navigator.clipboard.writeText(JSON.stringify(data, null, 2));
@@ -162,8 +167,16 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
   const anomalyText = anomalyCount > 0 ? `${anomalyCount} SUSPICIOUS AREA${anomalyCount > 1 ? 'S' : ''}` : 'NONE DETECTED';
   const anomalyColor = anomalyCount > 0 ? 'var(--c-crit)' : 'var(--text-main)';
 
-  const sameIssuer = caseEvidence.filter(e => e.id !== evidence.id && e.ai_report?.c2pa_data?.issuer === c2pa?.issuer && c2pa?.issuer && e.ai_report?.c2pa_data?.is_signed);
-  const sameDay = caseEvidence.filter(e => e.id !== evidence.id && e.uploaded_at.split('T')[0] === evidence.uploaded_at.split('T')[0]);
+  // Fortified: Safely extracting strings so map/filter don't crash
+  const evidenceUploadedDate = evidence?.uploaded_at ? evidence.uploaded_at.split('T')[0] : null;
+
+  const sameIssuer = caseEvidence?.filter(e => e?.id !== evidence?.id && e?.ai_report?.c2pa_data?.issuer === c2pa?.issuer && c2pa?.issuer && e?.ai_report?.c2pa_data?.is_signed) || [];
+  const sameDay = caseEvidence?.filter(e => {
+    if (!e?.uploaded_at || !evidenceUploadedDate) return false;
+    return e.id !== evidence?.id && e.uploaded_at.split('T')[0] === evidenceUploadedDate;
+  }) || [];
+
+  if (!evidence) return null; // Safety net for early mounting
 
   return (
     <div className="decision-workspace" style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', backgroundColor: '#050505', position: 'relative' }}>
@@ -182,15 +195,22 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
           
           {/* STABLE INVESTIGATION CONTEXT */}
           <div style={{ flexShrink: 0, padding: '16px 48px 16px 48px', backgroundColor: 'rgba(255,255,255,0.01)', display: 'flex', flexWrap: 'wrap', gap: '20px', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            
             <div style={{ flex: 1, minWidth: '300px' }}>
               <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '10px', letterSpacing: '0.1em', color: 'var(--text-faint)', marginBottom: '4px' }}>
-                <span style={{ color: `var(--c-${finalColorType})` }}>████</span> EVIDENCE ASSESSMENT
+                <span style={{ color: themeColor }}>████</span> EVIDENCE ASSESSMENT
               </div>
-              <div style={{ fontSize: '24px', fontWeight: 800, color: `var(--c-${finalColorType})`, letterSpacing: '-0.02em', marginBottom: '4px' }}>
-                {assessment.verdict.toUpperCase()}
+              
+              {/* FORCE THE DOSSIER HEADER TO MATCH THE SIDEBAR STATUS */}
+              <div style={{ fontSize: '24px', fontWeight: 800, color: themeColor, letterSpacing: '-0.02em', marginBottom: '4px' }}>
+                {platformStatus === 'CONFLICT' ? 'CONFLICT' : 
+                 platformStatus === 'CRITICAL THREAT' ? 'CRITICAL' : 
+                 (assessment.verdict?.toUpperCase() || 'PENDING')}
               </div>
+              
               <div style={{ fontSize: '13px', color: 'var(--text-main)' }}>
-                {assessment.msg} — {dispositionText}
+                {/* Clean up the subtext slightly to prevent repeating the word 'Conflict' if the backend disposition already includes it */}
+                {platformStatus === 'CONFLICT' ? dispositionText : `${assessment.msg} — ${dispositionText}`}
               </div>
             </div>
             
@@ -204,7 +224,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                     <circle 
                       cx="16" cy="16" r={gaugeRadius} 
                       fill="none" 
-                      stroke={assessment.conf !== 'N/A' ? `var(--c-${finalColorType})` : 'rgba(255,255,255,0.1)'} 
+                      stroke={assessment.conf !== 'N/A' ? themeColor : 'rgba(255,255,255,0.1)'} 
                       strokeWidth="3.5" 
                       strokeDasharray={gaugeCircumference} 
                       strokeDashoffset={assessment.conf !== 'N/A' ? gaugeOffset : gaugeCircumference} 
@@ -307,7 +327,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                               {item.evidence}
                             </div>
                             <div className="mono" style={{ fontSize: '9px', color: 'var(--text-faint)', letterSpacing: '0.05em', backgroundColor: 'rgba(0,0,0,0.5)', padding: '4px 8px', borderRadius: '4px', flexShrink: 0, whiteSpace: 'nowrap' }}>
-                              {item.category.toUpperCase()}
+                              {item.category?.toUpperCase()}
                             </div>
                           </div>
                         )
@@ -468,7 +488,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                    <div style={{ padding: '48px', textAlign: 'center', color: 'var(--c-crit)', border: '1px solid rgba(220, 38, 38, 0.2)', backgroundColor: 'rgba(220, 38, 38, 0.05)', borderRadius: '8px' }}>
                      <AlertTriangle size={32} style={{ margin: '0 auto 16px', opacity: 0.8 }} />
                      <div className="mono" style={{ fontSize: '12px', fontWeight: 600 }}>METADATA EXTRACTION FAILED</div>
-                     <div style={{ fontSize: '12px', marginTop: '8px', color: 'var(--text-muted)' }}>{exif.error}</div>
+                     <div style={{ fontSize: '12px', marginTop: '8px', color: 'var(--text-muted)' }}>{exif.error || 'Unknown Error'}</div>
                    </div>
                 ) : (
                   <>
@@ -480,10 +500,10 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                           <Camera size={14} /> HARDWARE / SOFTWARE FINGERPRINT
                         </div>
                         <div className="mono" style={{ display: 'grid', gridTemplateColumns: '100px 1fr', gap: '12px', fontSize: '11px', color: 'var(--text-muted)' }}>
-                          <div>Make</div><div style={{ color: 'var(--text-main)' }}>{exif.fingerprint.make}</div>
-                          <div>Model</div><div style={{ color: 'var(--text-main)' }}>{exif.fingerprint.model}</div>
-                          <div>Software</div><div style={{ color: exif.fingerprint.software !== 'None Detected' ? '#38bdf8' : 'var(--text-main)' }}>{exif.fingerprint.software}</div>
-                          <div>Original Name</div><div style={{ color: 'var(--text-main)', wordBreak: 'break-all' }}>{exif.fingerprint.original_filename}</div>
+                          <div>Make</div><div style={{ color: 'var(--text-main)' }}>{exif.fingerprint?.make || 'Unknown'}</div>
+                          <div>Model</div><div style={{ color: 'var(--text-main)' }}>{exif.fingerprint?.model || 'Unknown'}</div>
+                          <div>Software</div><div style={{ color: exif.fingerprint?.software !== 'None Detected' ? '#38bdf8' : 'var(--text-main)' }}>{exif.fingerprint?.software || 'Unknown'}</div>
+                          <div>Original Name</div><div style={{ color: 'var(--text-main)', wordBreak: 'break-all' }}>{exif.fingerprint?.original_filename || 'Unknown'}</div>
                         </div>
                       </div>
 
@@ -495,45 +515,45 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                         <div className="mono" style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '11px' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <span style={{ color: 'var(--text-muted)' }}>Metadata Stripped</span>
-                            <span style={{ color: exif.anomalies.likely_stripped ? 'var(--c-crit)' : '#10b981', fontWeight: 600 }}>{exif.anomalies.likely_stripped ? 'YES (Suspect)' : 'NO'}</span>
+                            <span style={{ color: exif.anomalies?.likely_stripped ? 'var(--c-crit)' : '#10b981', fontWeight: 600 }}>{exif.anomalies?.likely_stripped ? 'YES (Suspect)' : 'NO'}</span>
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <span style={{ color: 'var(--text-muted)' }}>Export Pipeline</span>
-                            <span style={{ color: exif.anomalies.likely_exported ? 'var(--c-warn)' : '#10b981', fontWeight: 600, textAlign: 'right' }}>
-                              {exif.anomalies.likely_exported ? (
-                                <>DETECTED <span style={{ fontSize: '9px', color: 'var(--text-faint)', display: 'block', fontWeight: 400 }}>Likely: {exif.fingerprint.software !== 'Unknown' ? exif.fingerprint.software : 'Unknown Encoder'}</span></>
+                            <span style={{ color: exif.anomalies?.likely_exported ? 'var(--c-warn)' : '#10b981', fontWeight: 600, textAlign: 'right' }}>
+                              {exif.anomalies?.likely_exported ? (
+                                <>DETECTED <span style={{ fontSize: '9px', color: 'var(--text-faint)', display: 'block', fontWeight: 400 }}>Likely: {exif.fingerprint?.software !== 'Unknown' ? exif.fingerprint?.software : 'Unknown Encoder'}</span></>
                               ) : 'NO'}
                             </span>
                           </div>
                           {/* Advanced CV Flags */}
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <span style={{ color: 'var(--text-muted)' }}>Error Level Analysis (ELA)</span>
-                            <span style={{ color: exif.anomalies.ela_anomaly ? 'var(--c-crit)' : '#10b981', fontWeight: 600 }}>{exif.anomalies.ela_anomaly ? 'ANOMALY DETECTED' : 'CLEAN'}</span>
+                            <span style={{ color: exif.anomalies?.ela_anomaly ? 'var(--c-crit)' : '#10b981', fontWeight: 600 }}>{exif.anomalies?.ela_anomaly ? 'ANOMALY DETECTED' : 'CLEAN'}</span>
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <span style={{ color: 'var(--text-muted)' }}>Double Compression (JPEG)</span>
-                            <span style={{ color: exif.anomalies.double_compression ? 'var(--c-warn)' : '#10b981', fontWeight: 600 }}>{exif.anomalies.double_compression ? 'DETECTED' : 'CLEAN'}</span>
+                            <span style={{ color: exif.anomalies?.double_compression ? 'var(--c-warn)' : '#10b981', fontWeight: 600 }}>{exif.anomalies?.double_compression ? 'DETECTED' : 'CLEAN'}</span>
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <span style={{ color: 'var(--text-muted)' }}>Color Profile Mismatch</span>
-                            <span style={{ color: exif.anomalies.color_profile_mismatch ? 'var(--c-warn)' : '#10b981', fontWeight: 600 }}>{exif.anomalies.color_profile_mismatch ? 'YES (Suspect)' : 'NO'}</span>
+                            <span style={{ color: exif.anomalies?.color_profile_mismatch ? 'var(--c-warn)' : '#10b981', fontWeight: 600 }}>{exif.anomalies?.color_profile_mismatch ? 'YES (Suspect)' : 'NO'}</span>
                           </div>
                           {/* Standard Flags */}
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <span style={{ color: 'var(--text-muted)' }}>Embedded EXIF GPS</span>
-                            <span style={{ color: exif.anomalies.gps_present ? '#38bdf8' : 'var(--text-faint)' }}>{exif.anomalies.gps_present ? 'PRESENT' : 'ABSENT'}</span>
+                            <span style={{ color: exif.anomalies?.gps_present ? '#38bdf8' : 'var(--text-faint)' }}>{exif.anomalies?.gps_present ? 'PRESENT' : 'ABSENT'}</span>
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <span style={{ color: 'var(--text-muted)' }}>Maker Notes (Raw)</span>
-                            <span style={{ color: exif.anomalies.makernotes_present ? '#38bdf8' : 'var(--text-faint)' }}>{exif.anomalies.makernotes_present ? 'PRESENT' : 'ABSENT'}</span>
+                            <span style={{ color: exif.anomalies?.makernotes_present ? '#38bdf8' : 'var(--text-faint)' }}>{exif.anomalies?.makernotes_present ? 'PRESENT' : 'ABSENT'}</span>
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <span style={{ color: 'var(--text-muted)' }}>Social Media Origin</span>
-                            <span style={{ color: exif.anomalies.social_media_origin ? 'var(--c-warn)' : '#10b981', fontWeight: 600 }}>{exif.anomalies.social_media_origin ? 'DETECTED' : 'NO'}</span>
+                            <span style={{ color: exif.anomalies?.social_media_origin ? 'var(--c-warn)' : '#10b981', fontWeight: 600 }}>{exif.anomalies?.social_media_origin ? 'DETECTED' : 'NO'}</span>
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <span style={{ color: 'var(--text-muted)' }}>USB Copy Artifacts</span>
-                            <span style={{ color: exif.anomalies.usb_copy_artifacts ? '#38bdf8' : 'var(--text-faint)' }}>{exif.anomalies.usb_copy_artifacts ? 'PRESENT' : 'ABSENT'}</span>
+                            <span style={{ color: exif.anomalies?.usb_copy_artifacts ? '#38bdf8' : 'var(--text-faint)' }}>{exif.anomalies?.usb_copy_artifacts ? 'PRESENT' : 'ABSENT'}</span>
                           </div>
                         </div>
                       </div>
@@ -584,7 +604,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                           </div>
 
                           <div style={{ gridColumn: '1 / -1' }}>
-                            <div style={{ color: 'var(--text-faint)', marginBottom: '4px' }}>Recovered Coordinates <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>(Source: {exif.anomalies.gps_present ? 'EXIF Header' : 'MakerNotes/Inferred'})</span></div>
+                            <div style={{ color: 'var(--text-faint)', marginBottom: '4px' }}>Recovered Coordinates <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>(Source: {exif.anomalies?.gps_present ? 'EXIF Header' : 'MakerNotes/Inferred'})</span></div>
                             <div style={{ color: exif.extended?.coordinates !== 'None Detected' ? '#38bdf8' : 'var(--text-main)' }}>{exif.extended?.coordinates || 'None Detected'}</div>
                           </div>
                         </div>
@@ -597,7 +617,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                       <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--text-faint)', letterSpacing: '0.1em', marginBottom: '20px' }}>
                         <Clock size={14} /> EXIF TIMELINE RECONSTRUCTION
                       </div>
-                      {Object.keys(exif.timeline).length === 0 ? (
+                      {!exif.timeline || Object.keys(exif.timeline).length === 0 ? (
                         <div className="mono" style={{ fontSize: '11px', color: 'var(--text-muted)' }}>No EXIF timestamps extracted.</div>
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -654,20 +674,23 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                     <div className="no-scrollbar" style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', padding: '0 48px', overflowX: 'auto' }}>
                       <div style={{ position: 'absolute', top: '24px', left: '48px', right: '48px', height: '2px', backgroundColor: 'rgba(255,255,255,0.1)', zIndex: 0 }}></div>
                       {history.map((node, i) => {
-                        const { color, Icon } = getNodeStyle(node.action);
+                        // Fortified against missing actions in JSON payload
+                        const actionString = node?.action ? String(node.action) : 'EVENT';
+                        const { color, Icon } = getNodeStyle(actionString);
+                        
                         return (
                           <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 1, minWidth: '120px' }}>
                             <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#0a0a0c', border: `2px solid ${color}`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' }}>
                                <Icon size={20} color={color} />
                             </div>
                             <div className="mono" style={{ padding: '4px 10px', backgroundColor: '#000', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '4px', fontSize: '10px', color: '#fff', fontWeight: 600, letterSpacing: '0.05em', marginBottom: '8px' }}>
-                              {node.action.toUpperCase()}
+                              {actionString.toUpperCase()}
                             </div>
                             <div style={{ fontSize: '11px', color: 'var(--text-main)', textAlign: 'center', marginBottom: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', minHeight: '16px' }}>
-                              {node.agent && node.agent !== 'null' ? node.agent : 'Unknown'}
+                              {node?.agent && node.agent !== 'null' ? node.agent : 'Unknown'}
                             </div>
                             <div className="mono" style={{ fontSize: '10px', textAlign: 'center' }}>
-                              {formatTimeNodes(node.timestamp)}
+                              {formatTimeNodes(node?.timestamp)}
                             </div>
                           </div>
                         );
@@ -698,26 +721,30 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                        <div className="mono" style={{ color: '#10b981', fontSize: '10px', letterSpacing: '0.2em', fontWeight: 600, marginBottom: '12px' }}>
                          ✓ VERIFIED CLAIM GENERATOR
                        </div>
-                       <div style={{ fontSize: '32px', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em', wordBreak: 'break-word' }}>{c2pa.issuer}</div>
+                       <div style={{ fontSize: '32px', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em', wordBreak: 'break-word' }}>{c2pa.issuer || 'Unknown Issuer'}</div>
                      </div>
                      
                      <div className="mono" style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: '16px', fontSize: '11px', color: 'var(--text-muted)', alignItems: 'center' }}>
                        <div>Status</div><div style={{ color: '#10b981', fontWeight: 600 }}>VALID MANIFEST</div>
-                       <div>Algorithm</div><div style={{ color: 'var(--text-main)' }}>{c2pa.algorithm}</div>
-                       <div>Timestamp</div><div style={{ color: 'var(--text-main)' }}>{c2pa.timestamp}</div>
+                       <div>Algorithm</div><div style={{ color: 'var(--text-main)' }}>{c2pa.algorithm || 'Unknown'}</div>
+                       <div>Timestamp</div><div style={{ color: 'var(--text-main)' }}>{c2pa.timestamp || 'Unknown'}</div>
                        
                        <div>Asset Hash</div>
                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                         <span style={{ color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{evidence.sha256.substring(0, 32)}...</span>
-                         <button onClick={() => handleInlineCopy('HASH', evidence.sha256)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px', flexShrink: 0 }} className="hover-bright">
+                         <span style={{ color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                           {evidence?.sha256 ? `${evidence.sha256.substring(0, 32)}...` : 'Pending...'}
+                         </span>
+                         <button onClick={() => handleInlineCopy('HASH', evidence?.sha256 || '')} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px', flexShrink: 0 }} className="hover-bright">
                            {copiedInline === 'HASH' ? <Check size={12} color="#10b981" /> : <Copy size={12} />}
                          </button>
                        </div>
 
                        <div>Manifest ID</div>
                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                         <span style={{ color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>urn:uuid:{evidence.id.split('-')[0]}...</span>
-                         <button onClick={() => handleInlineCopy('MANIFEST', `urn:uuid:${evidence.id}`)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px', flexShrink: 0 }} className="hover-bright">
+                         <span style={{ color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                           urn:uuid:{evidence?.id ? evidence.id.split('-')[0] : 'Unknown'}...
+                         </span>
+                         <button onClick={() => handleInlineCopy('MANIFEST', `urn:uuid:${evidence?.id}`)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px', flexShrink: 0 }} className="hover-bright">
                            {copiedInline === 'MANIFEST' ? <Check size={12} color="#10b981" /> : <Copy size={12} />}
                          </button>
                        </div>
@@ -758,7 +785,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                                  <div style={{ padding: '12px', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '6px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                    {sameIssuer.map(e => (
                                      <div key={e.id} className="mono" style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '12px' }}>{e.filename}</span>
+                                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '12px' }}>{e?.filename || 'Unknown'}</span>
                                        <span style={{ color: `var(--c-${AssessmentEngine.evaluate(e).type})` }}>{AssessmentEngine.evaluate(e).conf}%</span>
                                      </div>
                                    ))}
@@ -778,7 +805,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                            {sameDay.length > 0 ? (
                              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                                 <span style={{ fontSize: '13px', color: 'var(--text-main)' }}>{evidence.uploaded_at.split('T')[0]} ({sameDay.length} other assets)</span>
+                                 <span style={{ fontSize: '13px', color: 'var(--text-main)' }}>{evidenceUploadedDate || 'Unknown'} ({sameDay.length} other assets)</span>
                                  <button onClick={() => setExpandedCorrelation(prev => prev === 'DAY' ? null : 'DAY')} style={{ background: 'transparent', border: 'none', color: '#3b82f6', fontSize: '11px', cursor: 'pointer', padding: 0 }} className="hover-bright mono">
                                    {expandedCorrelation === 'DAY' ? 'Hide assets ↘' : 'View assets ↗'}
                                  </button>
@@ -787,7 +814,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                                  <div style={{ padding: '12px', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '6px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                    {sameDay.map(e => (
                                      <div key={e.id} className="mono" style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '12px' }}>{e.filename}</span>
+                                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '12px' }}>{e?.filename || 'Unknown'}</span>
                                        <span style={{ color: `var(--c-${AssessmentEngine.evaluate(e).type})` }}>{AssessmentEngine.evaluate(e).conf}%</span>
                                      </div>
                                    ))}
@@ -824,13 +851,13 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                       </button>
                       <span style={{ fontSize: '10px', color: 'var(--text-faint)', letterSpacing: '0.1em' }}>C2PA_MANIFEST.JSON</span>
                     </div>
-                    <button onClick={() => handleCopy('C2PA', evidence.ai_report?.c2pa_data)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px' }} className="hover-bright">
+                    <button onClick={() => handleCopy('C2PA', evidence?.ai_report?.c2pa_data)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px' }} className="hover-bright">
                       {copiedRaw === 'C2PA' ? <><Check size={12} color="#10b981" /> COPIED</> : <><Copy size={12} /> COPY</>}
                     </button>
                   </div>
                   {c2paExpanded && (
                     <div style={{ padding: '24px', overflowY: 'auto', maxHeight: '400px' }}>
-                      <pre className="mono" style={{ fontSize: '11px', margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }} dangerouslySetInnerHTML={{ __html: syntaxHighlight(evidence.ai_report?.c2pa_data || { status: 'No C2PA metadata available' }) }} />
+                      <pre className="mono" style={{ fontSize: '11px', margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }} dangerouslySetInnerHTML={{ __html: syntaxHighlight(evidence?.ai_report?.c2pa_data || { status: 'No C2PA metadata available' }) }} />
                     </div>
                   )}
                 </div>
@@ -843,13 +870,13 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence: Evi
                       </button>
                       <span style={{ fontSize: '10px', color: 'var(--text-faint)', letterSpacing: '0.1em' }}>VIT_INFERENCE.JSON</span>
                     </div>
-                    <button onClick={() => handleCopy('VIT', { deepfake_probability: evidence.ai_report?.deepfake_probability ?? null, platform_status: evidence.ai_report?.platform_status || 'UNKNOWN', disposition: evidence.ai_report?.disposition || 'No disposition available' })} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px' }} className="hover-bright">
+                    <button onClick={() => handleCopy('VIT', { deepfake_probability: evidence?.ai_report?.deepfake_probability ?? null, platform_status: evidence?.ai_report?.platform_status || 'UNKNOWN', disposition: evidence?.ai_report?.disposition || 'No disposition available' })} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px' }} className="hover-bright">
                       {copiedRaw === 'VIT' ? <><Check size={12} color="#10b981" /> COPIED</> : <><Copy size={12} /> COPY</>}
                     </button>
                   </div>
                   {vitExpanded && (
                     <div style={{ padding: '24px', overflowY: 'auto', maxHeight: '400px' }}>
-                      <pre className="mono" style={{ fontSize: '11px', margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }} dangerouslySetInnerHTML={{ __html: syntaxHighlight({ deepfake_probability: evidence.ai_report?.deepfake_probability ?? null, platform_status: evidence.ai_report?.platform_status || 'UNKNOWN', disposition: evidence.ai_report?.disposition || 'No disposition available' }) }} />
+                      <pre className="mono" style={{ fontSize: '11px', margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }} dangerouslySetInnerHTML={{ __html: syntaxHighlight({ deepfake_probability: evidence?.ai_report?.deepfake_probability ?? null, platform_status: evidence?.ai_report?.platform_status || 'UNKNOWN', disposition: evidence?.ai_report?.disposition || 'No disposition available' }) }} />
                     </div>
                   )}
                 </div>
