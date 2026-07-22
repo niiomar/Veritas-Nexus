@@ -29,6 +29,7 @@ STORAGE_VAULT = Path("/vault")
 
 # Read microservice credentials
 VIT_CORE_URL = os.getenv("VIT_CORE_URL", "http://host.docker.internal:8001/api/v1/analyze")
+# UPDATED: Replaced the incorrect C2PA token with the correct ViT-CORE token
 VIT_CORE_API_KEY = os.getenv("VIT_CORE_API_KEY", "vitcore_forensics_secure_token_2026")
 
 
