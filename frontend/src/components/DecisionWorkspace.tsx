@@ -137,6 +137,14 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
   const gaugeCircumference = 2 * Math.PI * gaugeRadius;
   const gaugeOffset = gaugeCircumference - (confValue / 100) * gaugeCircumference;
 
+  // --- FORENSIC DATA PREP FOR XAI UI ---
+  const isClean = !isVitUnavailable && vitProb !== null && vitProb < 0.15;
+  const isWarning = !isVitUnavailable && vitProb !== null && vitProb >= 0.15 && vitProb < 0.70;
+  const isCritical = !isVitUnavailable && vitProb !== null && vitProb >= 0.70;
+
+  const probColor = isClean ? '#10b981' : isWarning ? '#f59e0b' : isCritical ? '#ef4444' : 'var(--text-muted)';
+  const probText = isClean ? 'NOMINAL' : isWarning ? 'SUSPICIOUS' : isCritical ? 'CRITICAL' : 'N/A';
+
   // --- TIMELINE FORENSIC REASONING CALCULATIONS ---
   const parseExifDate = (dateStr: string) => {
     if (!dateStr) return null;
@@ -162,8 +170,6 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
     : [{ action: 'Origin', agent: 'Unknown Sensor/Software', timestamp: evidence?.created_at || 'Unknown', description: 'Initial file creation' }];
 
   const [mainTab, setMainTab] = useState<'MEDIA' | 'METADATA' | 'PROVENANCE' | 'CREDENTIAL' | 'CORRELATION' | 'RAW'>('MEDIA');
-  
-  // REMOVED 'PATCHES' FROM STATE
   const [imageTab, setImageTab] = useState<'SOURCE' | 'HEATMAP' | 'ATTENTION'>('SOURCE');
   
   const [imageFailed, setImageFailed] = useState(false);
@@ -401,7 +407,6 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
                     </div>
                   </div>
 
-                  {/* REMOVED PATCHES TAB BUTTON */}
                   <div className="no-scrollbar" style={{ display: 'flex', gap: '16px', overflowX: 'auto', borderBottom: '1px solid rgba(255,255,255,0.05)', padding: '0 32px' }}>
                     {['SOURCE', 'HEATMAP', 'ATTENTION'].map((tab) => (
                       <button 
@@ -449,18 +454,48 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
                     )}
                   </div>
                   
-                  <div className="mono" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', padding: '24px 32px', fontSize: '11px', color: 'var(--text-faint)', letterSpacing: '0.05em', background: 'rgba(255,255,255,0.02)', gap: '24px' }}>
+                  {/* FULLY REFACTORED: XAI COMPLIANT THREAT GAUGE */}
+                  <div className="mono" style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr', padding: '24px 32px', fontSize: '11px', color: 'var(--text-faint)', letterSpacing: '0.05em', background: 'rgba(255,255,255,0.02)', gap: '32px' }}>
+                    
                     <div>
-                      <div style={{marginBottom: '8px'}}>HEATMAP INTENSITY</div>
-                      <div style={{ position: 'relative', height: '4px', width: '100%', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '2px' }}>
-                        {!isVitUnavailable && <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, right: 0, background: 'linear-gradient(90deg, #3b82f6 0%, #10b981 40%, #f59e0b 70%, #ef4444 100%)', borderRadius: '2px', opacity: 0.8 }}></div>}
-                        {typeof vitProb === 'number' && <div style={{ position: 'absolute', left: `${vitProb * 100}%`, top: '-4px', bottom: '-4px', width: '2px', backgroundColor: '#fff', boxShadow: '0 0 4px rgba(255,255,255,0.8)' }}></div>}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <span>SYNTHETIC LIKELIHOOD</span>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '9px' }}>THRESHOLDS: 15% | 70%</span>
+                      </div>
+                      <div style={{ position: 'relative', height: '4px', width: '100%', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '2px', marginTop: '12px' }}>
+                        {!isVitUnavailable && (
+                          <>
+                            {/* Zoned Background */}
+                            <div style={{ position: 'absolute', left: '0%', width: '15%', height: '100%', backgroundColor: '#10b981', opacity: 0.3, borderRadius: '2px 0 0 2px' }}></div>
+                            <div style={{ position: 'absolute', left: '15%', width: '55%', height: '100%', backgroundColor: '#f59e0b', opacity: 0.3 }}></div>
+                            <div style={{ position: 'absolute', left: '70%', width: '30%', height: '100%', backgroundColor: '#ef4444', opacity: 0.3, borderRadius: '0 2px 2px 0' }}></div>
+                            
+                            {/* Threshold Markers */}
+                            <div style={{ position: 'absolute', left: '15%', top: '-4px', bottom: '-4px', width: '1px', backgroundColor: 'rgba(255,255,255,0.5)' }}></div>
+                            <div style={{ position: 'absolute', left: '70%', top: '-4px', bottom: '-4px', width: '1px', backgroundColor: 'rgba(255,255,255,0.5)' }}></div>
+                            
+                            {/* Active Value Fill */}
+                            <div style={{ position: 'absolute', left: '0%', width: `${(vitProb as number) * 100}%`, height: '100%', backgroundColor: probColor, borderRadius: '2px', transition: 'width 0.4s ease, background-color 0.4s ease' }}></div>
+                          </>
+                        )}
+                        {typeof vitProb === 'number' && (
+                          <div style={{ position: 'absolute', left: `${vitProb * 100}%`, top: '-4px', bottom: '-4px', width: '2px', backgroundColor: '#fff', boxShadow: '0 0 6px rgba(255,255,255,0.9)', zIndex: 2, transform: 'translateX(-50%)' }}></div>
+                        )}
                       </div>
                     </div>
+                    
                     <div>
-                      <div style={{marginBottom: '4px'}}>INFERENCE CONFIDENCE</div>
-                      <div style={{color: 'var(--text-main)', fontSize: '13px'}}>{typeof vitProb === 'number' ? ((1 - vitProb) * 100).toFixed(1) : '--'}%</div>
+                      <div style={{marginBottom: '4px'}}>PROBABILITY SCORE</div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                        <span style={{color: probColor, fontSize: '14px', fontWeight: 600}}>
+                          {typeof vitProb === 'number' ? `${(vitProb * 100).toFixed(1)}%` : '--'}
+                        </span>
+                        <span style={{ fontSize: '9px', color: probColor, opacity: 0.8 }}>
+                          {probText}
+                        </span>
+                      </div>
                     </div>
+
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       <div className="mono" style={{ fontSize: '10px', color: 'var(--text-faint)', letterSpacing: '0.1em' }}>
                         DETECTED ANOMALIES
@@ -468,7 +503,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
                       <div className="mono" style={{ fontSize: '13px', color: isVitUnavailable ? 'var(--text-muted)' : anomalyColor, fontWeight: 600 }}>
                         {isVitUnavailable ? 'N/A' : anomalyText}
                       </div>
-                      <div style={{ fontSize: '9px', color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'none' }}>
+                      <div style={{ fontSize: '9px', color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'none', lineHeight: 1.4 }}>
                         {isVitUnavailable ? 'Facial recognition prerequisite not met' : (anomalyCount > 0 ? 'Review heatmap for localization' : 'No localized threats found')}
                       </div>
                     </div>
