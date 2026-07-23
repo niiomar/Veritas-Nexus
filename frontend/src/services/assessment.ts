@@ -105,7 +105,7 @@ export const AssessmentEngine = {
 
     // Domain 4: Structural Consistency (Max 15) - Deficit Model with Explicit Baseline
     let structScore = 15;
-    let structEv: DomainEvidence[] = [{ text: "Baseline Structural Integrity", effect: 'Positive', pts: 15 }];
+    let structEv: DomainEvidence[] = [{ text: "Base Score Allocation", effect: 'Positive', pts: 15 }];
     
     if (exif?.anomalies) {
         let clean = true;
@@ -136,7 +136,7 @@ export const AssessmentEngine = {
 
     // Domain 5: Chain of Custody (Max 10) - Deficit Model with Explicit Baseline
     let cocScore = 10;
-    let cocEv: DomainEvidence[] = [{ text: "Baseline Custody Integrity", effect: 'Positive', pts: 10 }];
+    let cocEv: DomainEvidence[] = [{ text: "Base Score Allocation", effect: 'Positive', pts: 10 }];
     
     if (exif?.anomalies) {
         let clean = true;
@@ -200,7 +200,7 @@ export const AssessmentEngine = {
         conf: totalScore.toFixed(1),
         type,
         msg,
-        policy: "Weighted_XAI_v4.1",
+        policy: "Weighted_XAI_v4.2",
         domains: [
             { name: 'Cryptographic Provenance', score: provScore, max: 30, weight: 30, evidence: provEv },
             { name: 'AI Authenticity', score: aiScore, max: 25, weight: 25, evidence: aiEv },
