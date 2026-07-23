@@ -14,8 +14,7 @@ from application.ports.events import IEventDispatcher
 from application.use_cases.upload_evidence import UploadEvidenceUseCase
 from application.use_cases.case_management import CreateCaseUseCase
 
-# --- Infrastructure Providers ---
-
+# Infrastructure Providers
 async def get_db_session() -> AsyncSession:
     async with async_session_maker() as session:
         yield session
@@ -36,7 +35,7 @@ def get_identity_provider(request: Request) -> IIdentityProvider:
     # Extracts the JWT from the incoming FastAPI request context
     return JWTIdentityProvider()
 
-# --- Mock Implementations for Phase 1 ---
+# Mock Implementations for Phase 1
 # (To be replaced with concrete implementations as built out)
 class SimpleHashService:
     async def generate_sha256(self, file_stream) -> str:
@@ -53,8 +52,7 @@ class SimpleClock:
 def get_hash_service(): return SimpleHashService()
 def get_clock(): return SimpleClock()
 
-# --- Use Case Factories ---
-
+# Use Case Factories
 def get_upload_evidence_use_case(
     uow: IUnitOfWork = Depends(get_uow),
     storage: IStorageService = Depends(get_storage_service),
