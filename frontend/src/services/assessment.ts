@@ -39,7 +39,7 @@ export const AssessmentEngine = {
     // @ts-ignore
     const exif = evidence.metadata_dict?.exif;
 
-    // Domain 1: Cryptographic Provenance (Max 30)
+    // Domain 1: Cryptographic Provenance (Max 30) - Additive Model
     let provScore = 0;
     let provEv: DomainEvidence[] = [];
     if (c2pa?.is_signed) {
@@ -58,7 +58,7 @@ export const AssessmentEngine = {
         provEv.push({ text: "No Cryptographic Signature", effect: 'Neutral', pts: 0 });
     }
 
-    // Domain 2: AI Authenticity (Max 25)
+    // Domain 2: AI Authenticity (Max 25) - Additive Model
     let aiScore = 0;
     let aiEv: DomainEvidence[] = [];
     if (prob !== null && prob !== undefined) {
@@ -80,7 +80,7 @@ export const AssessmentEngine = {
         aiEv.push({ text: "Inference Unavailable (Faceless)", effect: 'Neutral', pts: 0 });
     }
 
-    // Domain 3: Metadata Integrity (Max 15)
+    // Domain 3: Metadata Integrity (Max 15) - Additive Model
     let metaScore = 0;
     let metaEv: DomainEvidence[] = [];
     if (exif && !exif.anomalies?.likely_stripped) {
@@ -103,38 +103,41 @@ export const AssessmentEngine = {
         metaEv.push({ text: "Metadata Completely Stripped", effect: 'Negative', pts: 0 });
     }
 
-    // Domain 4: Structural Consistency (Max 15)
+    // Domain 4: Structural Consistency (Max 15) - Deficit Model with Explicit Baseline
     let structScore = 15;
-    let structEv: DomainEvidence[] = [];
+    let structEv: DomainEvidence[] = [{ text: "Baseline Structural Integrity", effect: 'Positive', pts: 15 }];
+    
     if (exif?.anomalies) {
         let clean = true;
         if (exif.anomalies.ela_anomaly) {
-            structScore -= 10;
-            structEv.push({ text: "Error Level Analysis (ELA) Mismatch", effect: 'Negative', pts: -10 });
+            structScore -= 7;
+            structEv.push({ text: "Error Level Analysis (ELA) Mismatch", effect: 'Negative', pts: -7 });
             clean = false;
         }
         if (exif.anomalies.double_compression) {
-            structScore -= 5;
-            structEv.push({ text: "Double JPEG Compression", effect: 'Warning', pts: -5 });
+            structScore -= 4;
+            structEv.push({ text: "Double JPEG Compression", effect: 'Warning', pts: -4 });
             clean = false;
         }
         if (exif.anomalies.color_profile_mismatch) {
-            structScore -= 5;
-            structEv.push({ text: "Color Profile Mismatch", effect: 'Warning', pts: -5 });
+            structScore -= 4;
+            structEv.push({ text: "Color Profile Mismatch", effect: 'Warning', pts: -4 });
             clean = false;
         }
         if (clean) {
-            structEv.push({ text: "File Structure & Quantization Consistent", effect: 'Positive', pts: 15 });
+            // If clean, replace generic baseline text with specific positive confirmation
+            structEv[0].text = "File Structure & Quantization Consistent";
         }
     } else {
         structScore = 5;
-        structEv.push({ text: "Insufficient Structural Data", effect: 'Neutral', pts: 5 });
+        structEv = [{ text: "Insufficient Structural Data", effect: 'Neutral', pts: 5 }];
     }
     structScore = Math.max(0, structScore);
 
-    // Domain 5: Chain of Custody (Max 10)
+    // Domain 5: Chain of Custody (Max 10) - Deficit Model with Explicit Baseline
     let cocScore = 10;
-    let cocEv: DomainEvidence[] = [];
+    let cocEv: DomainEvidence[] = [{ text: "Baseline Custody Integrity", effect: 'Positive', pts: 10 }];
+    
     if (exif?.anomalies) {
         let clean = true;
         if (exif.anomalies.likely_exported) {
@@ -148,15 +151,16 @@ export const AssessmentEngine = {
             clean = false;
         }
         if (clean) {
-            cocEv.push({ text: "No Destructive Exports Detected", effect: 'Positive', pts: 10 });
+            // If clean, replace generic baseline text with specific positive confirmation
+            cocEv[0].text = "No Destructive Exports Detected";
         }
     } else {
         cocScore = 0;
-        cocEv.push({ text: "Custody Traces Unavailable", effect: 'Neutral', pts: 0 });
+        cocEv = [{ text: "Custody Traces Unavailable", effect: 'Neutral', pts: 0 }];
     }
     cocScore = Math.max(0, cocScore);
 
-    // Domain 6: Contextual Correlation (Max 5)
+    // Domain 6: Contextual Correlation (Max 5) - Additive Model
     let corrScore = 0;
     let corrEv: DomainEvidence[] = [];
     if (exif?.fingerprint?.make && exif.fingerprint.make !== 'Unknown') {
@@ -196,7 +200,7 @@ export const AssessmentEngine = {
         conf: totalScore.toFixed(1),
         type,
         msg,
-        policy: "Weighted_XAI_v4.0",
+        policy: "Weighted_XAI_v4.1",
         domains: [
             { name: 'Cryptographic Provenance', score: provScore, max: 30, weight: 30, evidence: provEv },
             { name: 'AI Authenticity', score: aiScore, max: 25, weight: 25, evidence: aiEv },
