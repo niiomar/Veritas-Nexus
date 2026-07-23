@@ -159,14 +159,21 @@ export const AssessmentEngine = {
     // Domain 6: Contextual Correlation (Max 5) - Pure Additive
     let corrScore = 0;
     let corrEv: DomainEvidence[] = [];
+    
+    // Test A: Hardware Anchor (2 pts)
     if (exif?.fingerprint?.make && exif.fingerprint.make !== 'Unknown') {
-        corrScore = 5;
-        corrEv.push({ text: `Sensor Identified: ${exif.fingerprint.make}`, effect: 'Positive', pts: 5 });
-    } else if (exif?.extended?.phash) {
-        corrScore = 3;
+        corrScore += 2;
+        corrEv.push({ text: `Hardware Sensor Identified: ${exif.fingerprint.make}`, effect: 'Positive', pts: 2 });
+    } else {
+        corrEv.push({ text: "Hardware Sensor Not Identified", effect: 'Neutral', pts: 0 });
+    }
+
+    // Test B: Visual Anchor (3 pts)
+    if (exif?.extended?.phash) {
+        corrScore += 3;
         corrEv.push({ text: "Visual DNA (pHash) Extracted", effect: 'Positive', pts: 3 });
     } else {
-        corrEv.push({ text: "No Contextual Anchors", effect: 'Neutral', pts: 0 });
+        corrEv.push({ text: "No Visual DNA (pHash) Extracted", effect: 'Neutral', pts: 0 });
     }
 
     const totalScore = provScore + aiScore + metaScore + structScore + cocScore + corrScore;
@@ -196,7 +203,7 @@ export const AssessmentEngine = {
         conf: totalScore.toFixed(1),
         type,
         msg,
-        policy: "Weighted_XAI_v4.5",
+        policy: "Weighted_XAI_v4.6",
         domains: [
             { name: 'Cryptographic Provenance', score: provScore, max: 30, weight: 30, evidence: provEv },
             { name: 'AI Authenticity', score: aiScore, max: 25, weight: 25, evidence: aiEv },
