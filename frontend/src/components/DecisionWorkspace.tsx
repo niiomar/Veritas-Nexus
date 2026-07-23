@@ -14,6 +14,12 @@ const dossierStyles = `
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   
+  /* NEW: Sleek Dark Mode Scrollbar for the Dossier */
+  .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+  .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+  .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+  
   .json-key { color: #94a3b8; }
   .json-string { color: #a3e635; }
   .json-number { color: #38bdf8; }
@@ -214,10 +220,10 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
   if (!evidence) return null;
 
   return (
-    <div className="decision-workspace" style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', backgroundColor: '#050505', position: 'relative' }}>
+    <div className="decision-workspace" style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', backgroundColor: '#050505', position: 'relative', overflow: 'hidden' }}>
       <style>{dossierStyles}</style>
       
-      {/* GLOBAL HEADER */}
+      {/* GLOBAL HEADER (Fixed at Top) */}
       <div style={{ flexShrink: 0, padding: '12px 48px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div className="mono" style={{ fontSize: '10px', letterSpacing: '0.15em', fontWeight: 500, color: 'var(--text-faint)' }}>VERITAS NEXUS / DOSSIER</div>
         <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '10px', letterSpacing: '0.1em' }} className="mono hover-bright">CLOSE ✕</button>
@@ -226,7 +232,9 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
       {isEval ? (
         <div style={{ padding: '120px 48px', color: 'var(--text-muted)' }}><div className="mono animate-pulse" style={{ letterSpacing: '0.1em', fontSize: '14px' }}>EXECUTING FUSION PROTOCOLS...</div></div>
       ) : (
-        <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+        /* --- MAIN SCROLLABLE DOSSIER BODY --- */
+        /* Changed overflow from hidden to overflowY: auto so the entire dossier can scroll together */
+        <div className="animate-fade-in custom-scrollbar" style={{ display: 'flex', flexDirection: 'column', flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
           
           {/* STABLE INVESTIGATION CONTEXT */}
           <div style={{ flexShrink: 0, padding: '16px 48px 16px 48px', backgroundColor: 'rgba(255,255,255,0.01)', display: 'flex', flexWrap: 'wrap', gap: '20px', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -299,7 +307,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
 
           {/* FULLY REFACTORED: COLLAPSIBLE XAI DOMAIN MATRIX */}
           {isMatrixExpanded && (
-            <div className="animate-fade-in" style={{ padding: '0 48px 16px 48px', backgroundColor: 'rgba(255,255,255,0.01)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+            <div className="animate-fade-in" style={{ flexShrink: 0, padding: '0 48px 16px 48px', backgroundColor: 'rgba(255,255,255,0.01)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', padding: '24px', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', backgroundColor: '#0a0a0c' }}>
                 {detailedAssessment.domains?.map((domain: any, idx: number) => (
                    <div key={idx} style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '6px', padding: '16px', display: 'flex', flexDirection: 'column' }}>
@@ -375,7 +383,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
           </div>
 
           {/* TAB CONTENT AREA */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '40px 48px' }}>
+          <div style={{ flexShrink: 0, padding: '40px 48px', paddingBottom: '80px' }}>
             
             {mainTab === 'MEDIA' && (
               <div style={{ display: 'flex', flexDirection: 'column', width: '100%', maxWidth: '1000px', margin: '0 auto', gap: '24px' }}>
