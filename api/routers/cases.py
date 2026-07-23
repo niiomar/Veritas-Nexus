@@ -43,12 +43,8 @@ async def create_case(
 async def get_case(case_id: UUID):
     # This would route to a GetCaseQuery handler in CQRS
     return {"message": f"Details for case {case_id}"}
-
-
-# ==========================================
-# ADDED: Missing Endpoints to fix HTTP 405
-# ==========================================
-
+    
+# Missing Endpoints
 @router.put("/{case_id}")
 async def update_case(
     case_id: UUID,
@@ -85,7 +81,6 @@ async def update_case(
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to update case in PostgreSQL: {str(e)}")
-
 
 @router.delete("/{case_id}")
 async def delete_case(
