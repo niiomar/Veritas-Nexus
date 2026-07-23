@@ -14,7 +14,7 @@ const dossierStyles = `
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   
-  /* NEW: Sleek Dark Mode Scrollbar for the Dossier */
+  /* Sleek Dark Mode Scrollbar for the Dossier */
   .custom-scrollbar::-webkit-scrollbar { width: 6px; }
   .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
   .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
@@ -162,7 +162,9 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
     : [{ action: 'Origin', agent: 'Unknown Sensor/Software', timestamp: evidence?.created_at || 'Unknown', description: 'Initial file creation' }];
 
   const [mainTab, setMainTab] = useState<'MEDIA' | 'METADATA' | 'PROVENANCE' | 'CREDENTIAL' | 'CORRELATION' | 'RAW'>('MEDIA');
-  const [imageTab, setImageTab] = useState<'SOURCE' | 'HEATMAP' | 'PATCHES' | 'ATTENTION'>('SOURCE');
+  
+  // REMOVED 'PATCHES' FROM STATE
+  const [imageTab, setImageTab] = useState<'SOURCE' | 'HEATMAP' | 'ATTENTION'>('SOURCE');
   
   const [imageFailed, setImageFailed] = useState(false);
   const [copiedRaw, setCopiedRaw] = useState<'C2PA' | 'VIT' | null>(null);
@@ -188,7 +190,6 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
     const token = imageTokens[tab] || viewSession;
     const qs = `?v=${token}`;
     if (tab === 'HEATMAP') return `${API_BASE_URL}/api/v1/evidence/${evidence.id}/heatmap${qs}`;
-    if (tab === 'PATCHES') return `${API_BASE_URL}/api/v1/evidence/${evidence.id}/patches${qs}`;
     if (tab === 'ATTENTION') return `${API_BASE_URL}/api/v1/evidence/${evidence.id}/attention${qs}`;
     return `${API_BASE_URL}/api/v1/evidence/${evidence.id}/download${qs}`; 
   }, [evidence?.id, viewSession, imageTokens]);
@@ -233,7 +234,6 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
         <div style={{ padding: '120px 48px', color: 'var(--text-muted)' }}><div className="mono animate-pulse" style={{ letterSpacing: '0.1em', fontSize: '14px' }}>EXECUTING FUSION PROTOCOLS...</div></div>
       ) : (
         /* --- MAIN SCROLLABLE DOSSIER BODY --- */
-        /* Changed overflow from hidden to overflowY: auto so the entire dossier can scroll together */
         <div className="animate-fade-in custom-scrollbar" style={{ display: 'flex', flexDirection: 'column', flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
           
           {/* STABLE INVESTIGATION CONTEXT */}
@@ -401,8 +401,9 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
                     </div>
                   </div>
 
+                  {/* REMOVED PATCHES TAB BUTTON */}
                   <div className="no-scrollbar" style={{ display: 'flex', gap: '16px', overflowX: 'auto', borderBottom: '1px solid rgba(255,255,255,0.05)', padding: '0 32px' }}>
-                    {['SOURCE', 'HEATMAP', 'PATCHES', 'ATTENTION'].map((tab) => (
+                    {['SOURCE', 'HEATMAP', 'ATTENTION'].map((tab) => (
                       <button 
                         key={tab} 
                         onClick={() => { 
