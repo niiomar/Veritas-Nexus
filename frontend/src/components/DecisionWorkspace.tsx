@@ -457,12 +457,12 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
                   {/* FULLY REFACTORED: XAI COMPLIANT THREAT GAUGE */}
                   <div className="mono" style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr', padding: '24px 32px', fontSize: '11px', color: 'var(--text-faint)', letterSpacing: '0.05em', background: 'rgba(255,255,255,0.02)', gap: '32px' }}>
                     
-                    <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                        <span>SYNTHETIC LIKELIHOOD</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '12px' }}>
+                        <span style={{ whiteSpace: 'nowrap' }}>SYNTHETIC LIKELIHOOD</span>
                         <span style={{ color: 'var(--text-muted)', fontSize: '9px' }}>THRESHOLDS: 15% | 70%</span>
                       </div>
-                      <div style={{ position: 'relative', height: '4px', width: '100%', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '2px', marginTop: '12px' }}>
+                      <div style={{ position: 'relative', height: '4px', width: '100%', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '2px' }}>
                         {!isVitUnavailable && (
                           <>
                             {/* Zoned Background */}
@@ -484,8 +484,8 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
                       </div>
                     </div>
                     
-                    <div>
-                      <div style={{marginBottom: '4px'}}>PROBABILITY SCORE</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                      <div style={{ marginBottom: '10px' }}>PROBABILITY SCORE</div>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
                         <span style={{color: probColor, fontSize: '14px', fontWeight: 600}}>
                           {typeof vitProb === 'number' ? `${(vitProb * 100).toFixed(1)}%` : '--'}
@@ -496,7 +496,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '8px' }}>
                       <div className="mono" style={{ fontSize: '10px', color: 'var(--text-faint)', letterSpacing: '0.1em' }}>
                         DETECTED ANOMALIES
                       </div>
