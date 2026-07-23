@@ -55,7 +55,7 @@ const formatTimeNodes = (ts: string | undefined | null) => {
 };
 
 export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Evidence[], onClose: () => void }> = ({ evidence, caseEvidence = [], onClose }) => {
-  const assessment = useMemo(() => evidence ? AssessmentEngine.evaluate(evidence) : { type: 'review', conf: 'N/A', verdict: 'UNKNOWN', msg: 'Pending' }, [evidence]);
+  const assessment = useMemo(() => evidence ? AssessmentEngine.evaluate(evidence) : { type: 'review', conf: 'N/A', verdict: 'UNKNOWN', msg: 'Pending', domains: [] }, [evidence]);
   const detailedAssessment = assessment as any; 
   
   const isEval = evidence?.status !== 'COMPLETED' || !evidence?.ai_report;
@@ -70,7 +70,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
   const isC2paBypassed = c2pa?.raw_status === "Bypassed by User";
   const isC2paBroken = c2pa?.status === "BROKEN_SIGNATURE";
   
-  // SYNCHRONIZED DOSSIER THEME LOGIC
+  // --- SYNCHRONIZED DOSSIER THEME LOGIC ---
   const finalVerdict = platformStatus === 'CONFLICT' ? 'CONFLICT' : 
                        platformStatus === 'CRITICAL THREAT' ? 'CRITICAL' : 
                        (assessment.verdict?.toUpperCase() || 'PENDING');
@@ -83,14 +83,14 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
   } else if (finalVerdict === 'INCONCLUSIVE') {
     themeColor = '#64748b'; // Dimmed Slate
   } else if (finalVerdict === 'UNVERIFIED' || finalVerdict === 'UNKNOWN') {
-    themeColor = '#cbd5e1'; // Brighter silver
+    themeColor = '#cbd5e1'; // Stronger, brighter silver for Unverified
   } else if (assessment.type === 'review') {
     themeColor = 'var(--c-warn, #f59e0b)'; // Generic review fallback
   } else {
     themeColor = 'var(--c-trust, #10b981)'; // Green
   }
 
-  // OVERRIDE BACKEND DISPOSITION STRING 
+  // --- OVERRIDE BACKEND DISPOSITION STRING ---
   let dispositionText = evidence?.ai_report?.disposition || 'Analysis complete.';
   
   if (dispositionText.includes('bypassed/offline')) {
@@ -109,7 +109,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
     dispositionText = 'No cryptographic signature found; neural inference unavailable (no viable subject).';
   }
 
-  // DYNAMIC SUBTEXT FORMATTER
+  // --- DYNAMIC SUBTEXT FORMATTER ---
   let finalSubtext = `${assessment.msg} — ${dispositionText}`;
   if (platformStatus === 'CONFLICT' || platformStatus === 'CRITICAL THREAT') {
     finalSubtext = dispositionText;
@@ -118,7 +118,6 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
   } else if (finalVerdict === 'INCONCLUSIVE') {
     finalSubtext = `Forensic markers fall below definitive trust threshold. ${dispositionText}`;
   } else if (finalVerdict === 'UNVERIFIED') {
-    
     if (dispositionText.toLowerCase().includes('analysis clean')) {
       finalSubtext = `Neural evaluation is nominal, but the absence of a cryptographic signature prevents definitive authentication.`;
     } else {
@@ -126,13 +125,13 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
     }
   }
 
-  // GAUGE CALCULATIONS
-  const confValue = assessment.conf !== 'N/A' ? parseFloat(assessment.conf) : 0;
+  // --- GAUGE CALCULATIONS ---
+  const confValue = assessment.conf !== 'N/A' ? parseFloat(assessment.conf as string) : 0;
   const gaugeRadius = 13;
   const gaugeCircumference = 2 * Math.PI * gaugeRadius;
   const gaugeOffset = gaugeCircumference - (confValue / 100) * gaugeCircumference;
 
-  // TIMELINE FORENSIC REASONING CALCULATIONS
+  // --- TIMELINE FORENSIC REASONING CALCULATIONS ---
   const parseExifDate = (dateStr: string) => {
     if (!dateStr) return null;
     const normalized = dateStr.replace(/^(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3');
@@ -298,75 +297,35 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
             </div>
           </div>
 
-          {/* COLLAPSIBLE WEIGHTED EVIDENCE MATRIX */}
+          {/* FULLY REFACTORED: COLLAPSIBLE XAI DOMAIN MATRIX */}
           {isMatrixExpanded && (
             <div className="animate-fade-in" style={{ padding: '0 48px 16px 48px', backgroundColor: 'rgba(255,255,255,0.01)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '32px', padding: '24px', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', backgroundColor: '#0a0a0c' }}>
-                
-                {/* Score Contributors */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', paddingRight: '16px', borderRight: '1px dashed rgba(255,255,255,0.1)' }}>
-                   <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '10px', color: 'var(--text-faint)', letterSpacing: '0.1em' }}>
-                     <Activity size={14} /> SCORE CONTRIBUTORS
-                   </div>
-                   
-                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '4px' }}>
-                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                       <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Authenticity</span>
-                       <span className="mono" style={{ fontSize: '13px', fontWeight: 600, color: detailedAssessment.contributors?.authenticity > 0 ? '#10b981' : detailedAssessment.contributors?.authenticity < 0 ? 'var(--c-crit)' : 'var(--text-faint)' }}>
-                         {detailedAssessment.contributors?.authenticity > 0 ? '+' : ''}{detailedAssessment.contributors?.authenticity || 0}
-                       </span>
-                     </div>
-                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                       <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Provenance</span>
-                       <span className="mono" style={{ fontSize: '13px', fontWeight: 600, color: detailedAssessment.contributors?.provenance > 0 ? '#10b981' : detailedAssessment.contributors?.provenance < 0 ? 'var(--c-crit)' : 'var(--text-faint)' }}>
-                         {detailedAssessment.contributors?.provenance > 0 ? '+' : ''}{detailedAssessment.contributors?.provenance || 0}
-                       </span>
-                     </div>
-                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                       <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Structural Consistency</span>
-                       <span className="mono" style={{ fontSize: '13px', fontWeight: 600, color: detailedAssessment.contributors?.structural > 0 ? '#10b981' : detailedAssessment.contributors?.structural < 0 ? 'var(--c-crit)' : 'var(--text-faint)' }}>
-                         {detailedAssessment.contributors?.structural > 0 ? '+' : ''}{detailedAssessment.contributors?.structural || 0}
-                       </span>
-                     </div>
-                   </div>
-                   
-                   <div style={{ marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.05)', fontSize: '10px', color: 'var(--text-faint)', lineHeight: 1.5 }}>
-                     Baseline integrity starts at 50. Modifiers are dynamically applied based on cryptographics, file structures, and neural inferences.
-                   </div>
-                </div>
-
-                {/* The Matrix Ledger */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 2 }}>
-                   <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '10px', color: 'var(--text-faint)', letterSpacing: '0.1em' }}>
-                     <Target size={14} /> FORENSIC LEDGER TRANSACTIONS
-                   </div>
-                   
-                   <div className="no-scrollbar" style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '160px', overflowY: 'auto', paddingRight: '8px' }}>
-                     {detailedAssessment.matrix?.map((item: any, i: number) => {
-                        let color = 'var(--text-main)';
-                        let bg = 'rgba(255,255,255,0.02)';
-                        if (item.effect === 'Positive') { color = '#10b981'; bg = 'rgba(16, 185, 129, 0.05)'; }
-                        if (item.effect === 'Warning') { color = '#f59e0b'; bg = 'rgba(245, 158, 11, 0.05)'; }
-                        if (item.effect === 'Critical') { color = '#ef4444'; bg = 'rgba(239, 68, 68, 0.05)'; }
-                        if (item.effect === 'Neutral') { color = 'var(--text-muted)'; }
-                        
-                        return (
-                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '10px 16px', backgroundColor: bg, border: `1px solid ${bg.replace('0.05', '0.1')}`, borderRadius: '4px' }}>
-                            <div className="mono" style={{ width: '40px', fontSize: '12px', color, fontWeight: 700, textAlign: 'right', flexShrink: 0 }}>
-                               {item.weight > 0 ? '+' : ''}{item.weight}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', padding: '24px', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', backgroundColor: '#0a0a0c' }}>
+                {detailedAssessment.domains?.map((domain: any, idx: number) => (
+                   <div key={idx} style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '6px', padding: '16px', display: 'flex', flexDirection: 'column' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                         <span style={{ fontSize: '11px', color: 'var(--text-faint)', letterSpacing: '0.05em' }} className="mono">
+                            {domain.name.toUpperCase()} <span style={{opacity: 0.5}}>({domain.weight}%)</span>
+                         </span>
+                         <span className="mono" style={{ fontSize: '12px', fontWeight: 700, color: domain.score === domain.max ? '#10b981' : domain.score === 0 ? 'var(--text-muted)' : '#38bdf8' }}>
+                            {domain.score} / {domain.max}
+                         </span>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1 }}>
+                         {domain.evidence.map((ev: any, i: number) => (
+                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  {ev.effect === 'Positive' ? <Check size={12} color="#10b981" style={{flexShrink:0}}/> : ev.effect === 'Negative' ? <AlertTriangle size={12} color="#ef4444" style={{flexShrink:0}}/> : ev.effect === 'Warning' ? <AlertTriangle size={12} color="#f59e0b" style={{flexShrink:0}}/> : <Circle size={10} color="var(--text-muted)" style={{flexShrink:0}}/>}
+                                  <span style={{ fontSize: '11px', color: 'var(--text-main)', lineHeight: 1.4 }}>{ev.text}</span>
+                               </div>
+                               <span className="mono" style={{ fontSize: '10px', color: ev.effect === 'Positive' ? '#10b981' : ev.effect === 'Negative' ? '#ef4444' : ev.effect === 'Warning' ? '#f59e0b' : 'var(--text-muted)', flexShrink: 0, marginTop: '2px' }}>
+                                  {ev.pts > 0 ? '+' : ''}{ev.pts} pts
+                               </span>
                             </div>
-                            <div style={{ flex: 1, fontSize: '12px', color: 'var(--text-main)', minWidth: 0, wordWrap: 'break-word' }}>
-                              {item.evidence}
-                            </div>
-                            <div className="mono" style={{ fontSize: '9px', color: 'var(--text-faint)', letterSpacing: '0.05em', backgroundColor: 'rgba(0,0,0,0.5)', padding: '4px 8px', borderRadius: '4px', flexShrink: 0, whiteSpace: 'nowrap' }}>
-                              {item.category?.toUpperCase()}
-                            </div>
-                          </div>
-                        )
-                     })}
+                         ))}
+                      </div>
                    </div>
-                </div>
-
+                ))}
               </div>
             </div>
           )}
@@ -525,7 +484,6 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
                   <>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
                       
-                      {/* Fingerprint Card */}
                       <div style={{ backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '32px' }}>
                         <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--text-faint)', letterSpacing: '0.1em', marginBottom: '16px' }}>
                           <Camera size={14} /> HARDWARE / SOFTWARE FINGERPRINT
@@ -538,7 +496,6 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
                         </div>
                       </div>
 
-                      {/* Anomaly & Stripping Card */}
                       <div style={{ backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '32px' }}>
                         <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--text-faint)', letterSpacing: '0.1em', marginBottom: '16px' }}>
                           <FileMinus size={14} /> FORENSIC FLAGS
@@ -556,7 +513,6 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
                               ) : 'NO'}
                             </span>
                           </div>
-                          {/* Advanced CV Flags */}
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <span style={{ color: 'var(--text-muted)' }}>Error Level Analysis (ELA)</span>
                             <span style={{ color: exif.anomalies?.ela_anomaly ? 'var(--c-crit)' : '#10b981', fontWeight: 600 }}>{exif.anomalies?.ela_anomaly ? 'ANOMALY DETECTED' : 'CLEAN'}</span>
@@ -569,7 +525,6 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
                             <span style={{ color: 'var(--text-muted)' }}>Color Profile Mismatch</span>
                             <span style={{ color: exif.anomalies?.color_profile_mismatch ? 'var(--c-warn)' : '#10b981', fontWeight: 600 }}>{exif.anomalies?.color_profile_mismatch ? 'YES (Suspect)' : 'NO'}</span>
                           </div>
-                          {/* Standard Flags */}
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <span style={{ color: 'var(--text-muted)' }}>Embedded EXIF GPS</span>
                             <span style={{ color: exif.anomalies?.gps_present ? '#38bdf8' : 'var(--text-faint)' }}>{exif.anomalies?.gps_present ? 'PRESENT' : 'ABSENT'}</span>
@@ -589,7 +544,6 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
                         </div>
                       </div>
                       
-                      {/* Extended File & Telemetry Attributes */}
                       <div style={{ backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '32px', gridColumn: '1 / -1' }}>
                         <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--text-faint)', letterSpacing: '0.1em', marginBottom: '16px' }}>
                           <Target size={14} /> FILE & TELEMETRY ATTRIBUTES
@@ -628,7 +582,6 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
                             <div style={{ color: 'var(--text-main)' }}>{exif.extended?.focal_length || 'Unknown'}</div>
                           </div>
                           
-                          {/* Visual DNA Injection */}
                           <div style={{ gridColumn: '1 / -1' }}>
                             <div style={{ color: 'var(--text-faint)', marginBottom: '4px' }}>Perceptual Hash (Visual DNA) <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>(Resists Spoliation)</span></div>
                             <div style={{ color: '#38bdf8', fontFamily: 'monospace', letterSpacing: '0.1em' }}>{exif.extended?.phash || 'Unknown'}</div>
@@ -643,7 +596,6 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
 
                     </div>
 
-                    {/* Timeline Strip */}
                     <div style={{ backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', padding: '32px' }}>
                       <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--text-faint)', letterSpacing: '0.1em', marginBottom: '20px' }}>
                         <Clock size={14} /> EXIF TIMELINE RECONSTRUCTION
@@ -705,8 +657,6 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
                     <div className="no-scrollbar" style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', padding: '0 48px', overflowX: 'auto' }}>
                       <div style={{ position: 'absolute', top: '24px', left: '48px', right: '48px', height: '2px', backgroundColor: 'rgba(255,255,255,0.1)', zIndex: 0 }}></div>
                       {history.map((node, i) => {
-                        
-                      // Fortified against missing actions in JSON payload
                         const actionString = node?.action ? String(node.action) : 'EVENT';
                         const { color, Icon } = getNodeStyle(actionString);
                         
