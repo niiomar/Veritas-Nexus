@@ -31,7 +31,6 @@ STORAGE_VAULT = Path("/vault")
 VIT_CORE_URL = os.getenv("VIT_CORE_URL", "http://host.docker.internal:8001/api/v1/analyze")
 VIT_CORE_API_KEY = os.getenv("VIT_CORE_API_KEY", "vitcore_forensics_secure_token_2026")
 
-
 @router.post("/")
 async def ingest_evidence(
     case_id: uuid.UUID = Form(...),
@@ -148,7 +147,6 @@ async def list_evidence(db: AsyncSession = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch library: {str(e)}")
 
-
 @router.get("/{evidence_id}/download")
 async def get_evidence_file(evidence_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     """Serves the raw physical file for the SOURCE tab."""
@@ -165,7 +163,6 @@ async def get_evidence_file(evidence_id: uuid.UUID, db: AsyncSession = Depends(g
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to retrieve file: {str(e)}")
-
 
 def fetch_visual_from_microservice(file_path: str, visual_type: str) -> bytes:
     """Extracts specific visual layers (heatmap, patches, attention) from the ViT-CORE."""
@@ -230,21 +227,17 @@ async def _proxy_visual(evidence_id: uuid.UUID, visual_type: str, db: AsyncSessi
         logger.error(f"Endpoint Error: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail="Internal server error during proxy.")
 
-
 @router.get("/{evidence_id}/heatmap", tags=["Evidence", "ViT-CORE"])
 async def get_heatmap(evidence_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     return await _proxy_visual(evidence_id, "heatmap", db)
-
 
 @router.get("/{evidence_id}/patches", tags=["Evidence", "ViT-CORE"])
 async def get_patches(evidence_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     return await _proxy_visual(evidence_id, "patches", db)
 
-
 @router.get("/{evidence_id}/attention", tags=["Evidence", "ViT-CORE"])
 async def get_attention(evidence_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     return await _proxy_visual(evidence_id, "attention", db)
-
 
 @router.delete("/{evidence_id}", tags=["Evidence"])
 async def delete_evidence(evidence_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
