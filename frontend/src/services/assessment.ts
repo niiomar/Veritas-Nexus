@@ -1,33 +1,36 @@
-
+// src/services/assessment.ts
 import type { Evidence, EvidenceAssessment } from '../types';
 
-export interface EvidenceMatrixItem {
-  evidence: string;
+export interface DomainEvidence {
+  text: string;
+  effect: 'Positive' | 'Negative' | 'Neutral' | 'Warning';
+  pts: number;
+}
+
+export interface DomainScore {
+  name: string;
+  score: number;
+  max: number;
   weight: number;
-  effect: 'Positive' | 'Warning' | 'Critical' | 'Neutral';
-  category: 'Authenticity' | 'Provenance' | 'Structural';
+  evidence: DomainEvidence[];
 }
 
 export interface DetailedEvidenceAssessment extends EvidenceAssessment {
-  matrix: EvidenceMatrixItem[];
-  contributors: {
-    authenticity: number;
-    provenance: number;
-    structural: number;
-  };
+  domains: DomainScore[];
+  totalScore: number;
 }
 
 export const AssessmentEngine = {
   evaluate: (evidence: Evidence): DetailedEvidenceAssessment => {
-    if (!evidence.ai_report) {
+    if (!evidence?.ai_report) {
       return { 
         verdict: "EVALUATING" as any, 
         conf: "--", 
         type: "neutral", 
         msg: "Evaluating Pipeline...", 
         policy: "Pending",
-        matrix: [],
-        contributors: { authenticity: 0, provenance: 0, structural: 0 }
+        domains: [],
+        totalScore: 0
       };
     }
     
@@ -36,119 +39,173 @@ export const AssessmentEngine = {
     // @ts-ignore
     const exif = evidence.metadata_dict?.exif;
 
-    const matrix: EvidenceMatrixItem[] = [];
-    let score = 50; 
-    
-    let authScore = 0;
+    // Domain 1: Cryptographic Provenance (Max 30)
     let provScore = 0;
-    let structScore = 0;
-
-    const addRule = (desc: string, weight: number, effect: 'Positive' | 'Warning' | 'Critical' | 'Neutral', category: 'Authenticity' | 'Provenance' | 'Structural') => {
-      matrix.push({ evidence: desc, weight, effect, category });
-      score += weight;
-      if (category === 'Authenticity') authScore += weight;
-      if (category === 'Provenance') provScore += weight;
-      if (category === 'Structural') structScore += weight;
-    };
-
-    // --- PROVENANCE & AUTHENTICITY EVALUATION ---
+    let provEv: DomainEvidence[] = [];
     if (c2pa?.is_signed) {
-        addRule("C2PA Cryptographic Signature Present", 25, "Positive", "Authenticity");
         if (c2pa.status === "VALID") {
-            addRule("C2PA Manifest Validated", 20, "Positive", "Authenticity");
+            provScore = 30;
+            provEv.push({ text: "Valid C2PA Manifest & Signature", effect: 'Positive', pts: 30 });
         } else if (c2pa.status === "BROKEN_SIGNATURE") {
-            addRule("C2PA Signature Tampered/Broken", -50, "Critical", "Provenance");
-        }
-    } else {
-        addRule("No C2PA Provenance Found", -5, "Neutral", "Provenance");
-    }
-
-    if (exif) {
-        if (exif.fingerprint?.make && exif.fingerprint.make !== 'Unknown') {
-            addRule(`Original Hardware Identified (${exif.fingerprint.make})`, 10, "Positive", "Authenticity");
-        }
-        if (exif.anomalies?.likely_stripped) {
-            addRule("Metadata Completely Stripped", -15, "Warning", "Provenance");
-        }
-        if (exif.anomalies?.likely_exported) {
-            addRule("Export/Editor Signature Detected", -10, "Warning", "Provenance");
-        }
-        if (exif.anomalies?.social_media_origin) {
-            addRule("Social Media Compression Signature", -5, "Neutral", "Provenance");
-        }
-    } else {
-        addRule("No Standard EXIF Data Found", -10, "Warning", "Provenance");
-    }
-
-    // --- STRUCTURAL CONSISTENCY EVALUATION (ViT & CV) ---
-    if (prob !== null) {
-        if (prob < 0.20) {
-            addRule("ViT Inference: High Structural Integrity", 25, "Positive", "Structural");
-        } else if (prob > 0.70) {
-            addRule("ViT Inference: Synthetic Artifacts Detected", -35, "Critical", "Structural");
+            provScore = 0;
+            provEv.push({ text: "Signature Tampered / Broken", effect: 'Negative', pts: 0 });
         } else {
-            addRule("ViT Inference: Inconclusive/Borderline", -5, "Neutral", "Structural");
+            provScore = 15;
+            provEv.push({ text: "Partial/Invalid C2PA Manifest", effect: 'Warning', pts: 15 });
         }
     } else {
-        addRule("Neural Inference Unavailable (No Viable Subject)", 0, "Neutral", "Structural");
+        provScore = 0;
+        provEv.push({ text: "No Cryptographic Signature", effect: 'Neutral', pts: 0 });
     }
 
+    // Domain 2: AI Authenticity (Max 25)
+    let aiScore = 0;
+    let aiEv: DomainEvidence[] = [];
+    if (prob !== null && prob !== undefined) {
+        if (prob < 0.15) {
+            aiScore = 25;
+            aiEv.push({ text: "ViT Inference: Clean (No anomalies)", effect: 'Positive', pts: 25 });
+        } else if (prob < 0.40) {
+            aiScore = 15;
+            aiEv.push({ text: "ViT Inference: Minor artifacts", effect: 'Warning', pts: 15 });
+        } else if (prob < 0.70) {
+            aiScore = 5;
+            aiEv.push({ text: "ViT Inference: Suspicious regions", effect: 'Warning', pts: 5 });
+        } else {
+            aiScore = 0;
+            aiEv.push({ text: "ViT Inference: Synthetic/Deepfake", effect: 'Negative', pts: 0 });
+        }
+    } else {
+        aiScore = 0;
+        aiEv.push({ text: "Inference Unavailable (Faceless)", effect: 'Neutral', pts: 0 });
+    }
+
+    // Domain 3: Metadata Integrity (Max 15)
+    let metaScore = 0;
+    let metaEv: DomainEvidence[] = [];
+    if (exif && !exif.anomalies?.likely_stripped) {
+        metaScore += 5;
+        metaEv.push({ text: "EXIF Profile Present", effect: 'Positive', pts: 5 });
+        if (exif.anomalies?.gps_present) {
+            metaScore += 5;
+            metaEv.push({ text: "GPS Coordinates Embedded", effect: 'Positive', pts: 5 });
+        } else {
+            metaEv.push({ text: "No GPS Data", effect: 'Neutral', pts: 0 });
+        }
+        if (exif.anomalies?.makernotes_present) {
+            metaScore += 5;
+            metaEv.push({ text: "Raw MakerNotes Intact", effect: 'Positive', pts: 5 });
+        } else {
+            metaEv.push({ text: "No MakerNotes", effect: 'Neutral', pts: 0 });
+        }
+    } else {
+        metaScore = 0;
+        metaEv.push({ text: "Metadata Completely Stripped", effect: 'Negative', pts: 0 });
+    }
+
+    // Domain 4: Structural Consistency (Max 15)
+    let structScore = 15;
+    let structEv: DomainEvidence[] = [];
     if (exif?.anomalies) {
+        let clean = true;
         if (exif.anomalies.ela_anomaly) {
-            addRule("Error Level Analysis (ELA) Mismatch", -20, "Critical", "Structural");
+            structScore -= 10;
+            structEv.push({ text: "Error Level Analysis (ELA) Mismatch", effect: 'Negative', pts: -10 });
+            clean = false;
         }
         if (exif.anomalies.double_compression) {
-            addRule("Double JPEG Compression Detected", -10, "Warning", "Structural");
+            structScore -= 5;
+            structEv.push({ text: "Double JPEG Compression", effect: 'Warning', pts: -5 });
+            clean = false;
         }
         if (exif.anomalies.color_profile_mismatch) {
-            addRule("Color Profile Mismatch", -8, "Warning", "Structural");
+            structScore -= 5;
+            structEv.push({ text: "Color Profile Mismatch", effect: 'Warning', pts: -5 });
+            clean = false;
         }
+        if (clean) {
+            structEv.push({ text: "File Structure & Quantization Consistent", effect: 'Positive', pts: 15 });
+        }
+    } else {
+        structScore = 5;
+        structEv.push({ text: "Insufficient Structural Data", effect: 'Neutral', pts: 5 });
+    }
+    structScore = Math.max(0, structScore);
+
+    // Domain 5: Chain of Custody (Max 10)
+    let cocScore = 10;
+    let cocEv: DomainEvidence[] = [];
+    if (exif?.anomalies) {
+        let clean = true;
+        if (exif.anomalies.likely_exported) {
+            cocScore -= 5;
+            cocEv.push({ text: `Export Pipeline: ${exif.fingerprint?.software || 'Unknown'}`, effect: 'Warning', pts: -5 });
+            clean = false;
+        }
+        if (exif.anomalies.social_media_origin) {
+            cocScore -= 5;
+            cocEv.push({ text: "Social Media Platform Origin", effect: 'Warning', pts: -5 });
+            clean = false;
+        }
+        if (clean) {
+            cocEv.push({ text: "No Destructive Exports Detected", effect: 'Positive', pts: 10 });
+        }
+    } else {
+        cocScore = 0;
+        cocEv.push({ text: "Custody Traces Unavailable", effect: 'Neutral', pts: 0 });
+    }
+    cocScore = Math.max(0, cocScore);
+
+    // Domain 6: Contextual Correlation (Max 5)
+    let corrScore = 0;
+    let corrEv: DomainEvidence[] = [];
+    if (exif?.fingerprint?.make && exif.fingerprint.make !== 'Unknown') {
+        corrScore = 5;
+        corrEv.push({ text: `Sensor Identified: ${exif.fingerprint.make}`, effect: 'Positive', pts: 5 });
+    } else if (exif?.extended?.phash) {
+        corrScore = 3;
+        corrEv.push({ text: "Visual DNA (pHash) Extracted", effect: 'Positive', pts: 3 });
+    } else {
+        corrEv.push({ text: "No Contextual Anchors", effect: 'Neutral', pts: 0 });
     }
 
-    const finalScore = Math.max(0, Math.min(100, score));
+    const totalScore = provScore + aiScore + metaScore + structScore + cocScore + corrScore;
 
-    // --- DETERMINE FORENSIC VERDICT ---
+    // Verdict Logic
     let verdict: any = 'UNVERIFIED';
     let type: 'trust' | 'neutral' | 'review' | 'crit' = 'neutral';
     let msg = "Insufficient Provenance";
     
-    const hasMajorContradiction = (authScore > 15 && structScore <= -15) || (c2pa?.is_signed && c2pa?.status === "VALID" && prob !== null && prob > 0.70);
-    const lacksInformation = matrix.length <= 4 && !c2pa?.is_signed && prob === null;
+    const hasMajorContradiction = (c2pa?.is_signed && c2pa?.status === "VALID" && prob !== null && prob > 0.70);
+    const isCrit = (prob !== null && prob > 0.70) || c2pa?.status === "BROKEN_SIGNATURE";
 
     if (hasMajorContradiction) {
-        verdict = 'CONFLICT';
-        type = 'review';
-        msg = "Evidence Contradicts";
-    } else if (lacksInformation) {
-        verdict = 'INCONCLUSIVE';
-        type = 'review';
-        msg = "Evidence Insufficient";
-    } else if (finalScore >= 80) {
-        verdict = 'VERIFIED';
-        type = 'trust';
-        msg = "Authenticity Established";
-    } else if (finalScore <= 35 || c2pa?.status === 'BROKEN_SIGNATURE') {
-        verdict = 'CRITICAL';
-        type = 'crit';
-        msg = "Likely Manipulated";
+        verdict = 'CONFLICT'; type = 'review'; msg = "Evidence Contradicts";
+    } else if (isCrit) {
+        verdict = 'CRITICAL'; type = 'crit'; msg = "Likely Manipulated";
+    } else if (totalScore >= 75) {
+        verdict = 'VERIFIED'; type = 'trust'; msg = "Authenticity Established";
+    } else if (totalScore >= 40) {
+        verdict = 'UNVERIFIED'; type = 'neutral'; msg = "Insufficient Provenance";
     } else {
-        verdict = 'UNVERIFIED';
-        type = 'neutral';
-        msg = "Insufficient Provenance";
+        verdict = 'INCONCLUSIVE'; type = 'review'; msg = "Low Integrity Score";
     }
 
     return {
         verdict,
-        conf: finalScore.toFixed(1),
+        conf: totalScore.toFixed(1),
         type,
         msg,
-        policy: `WeightedMatrix_v3.0`,
-        matrix,
-        contributors: {
-            authenticity: authScore,
-            provenance: provScore,
-            structural: structScore
-        }
+        policy: "Weighted_XAI_v4.0",
+        domains: [
+            { name: 'Cryptographic Provenance', score: provScore, max: 30, weight: 30, evidence: provEv },
+            { name: 'AI Authenticity', score: aiScore, max: 25, weight: 25, evidence: aiEv },
+            { name: 'Metadata Integrity', score: metaScore, max: 15, weight: 15, evidence: metaEv },
+            { name: 'Structural Consistency', score: structScore, max: 15, weight: 15, evidence: structEv },
+            { name: 'Chain of Custody', score: cocScore, max: 10, weight: 10, evidence: cocEv },
+            { name: 'Contextual Correlation', score: corrScore, max: 5, weight: 5, evidence: corrEv }
+        ],
+        totalScore
     };
   }
 };
