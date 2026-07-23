@@ -2,7 +2,6 @@ from domain.correlation import EvidenceGraph, FindingCategory, FindingSeverity
 from domain.models import TrustLevel, Disposition
 from domain.policies.base import EvaluationPolicy, PolicyResult
 
-
 class ConflictingEvidencePolicy(EvaluationPolicy):
     """
     Acts as a circuit breaker. Triggers if strong cryptography exists alongside 
@@ -27,13 +26,13 @@ class ConflictingEvidencePolicy(EvaluationPolicy):
             )
         return PolicyResult(triggered=False)
 
-
 class CriticalArtifactDetectedPolicy(EvaluationPolicy):
     """
     Standard policy for severe deepfake detection.
     """
     def evaluate(self, graph: EvidenceGraph) -> PolicyResult:
         if graph.has_critical_findings():
+           
             # Extract highest confidence critical finding for the rationale
             criticals = [f for f in graph.findings if f.severity == FindingSeverity.CRITICAL]
             highest_conf = sorted(criticals, key=lambda x: x.confidence, reverse=True)[0]
