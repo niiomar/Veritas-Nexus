@@ -454,43 +454,46 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
                     )}
                   </div>
                   
-                  {/* FULLY REFACTORED: XAI COMPLIANT THREAT GAUGE */}
+                  {/* FULLY REFACTORED: XAI STATIC THREAT GAUGE */}
                   <div className="mono" style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr', padding: '24px 32px', fontSize: '11px', color: 'var(--text-faint)', letterSpacing: '0.05em', background: 'rgba(255,255,255,0.02)', gap: '32px' }}>
                     
                     <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '12px' }}>
-                        <span style={{ whiteSpace: 'nowrap' }}>SYNTHETIC LIKELIHOOD</span>
-                        <span style={{ color: 'var(--text-muted)', fontSize: '9px' }}>THRESHOLDS: 15% | 70%</span>
+                      <div style={{ marginBottom: '18px', color: 'var(--text-main)', fontSize: '11px', letterSpacing: '0.1em' }}>
+                        SYNTHETIC LIKELIHOOD
                       </div>
-                      <div style={{ position: 'relative', height: '4px', width: '100%', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '2px' }}>
+                      <div style={{ position: 'relative', height: '6px', width: '100%', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '3px' }}>
                         {!isVitUnavailable && (
                           <>
-                            {/* Zoned Background */}
-                            <div style={{ position: 'absolute', left: '0%', width: '15%', height: '100%', backgroundColor: '#10b981', opacity: 0.3, borderRadius: '2px 0 0 2px' }}></div>
-                            <div style={{ position: 'absolute', left: '15%', width: '55%', height: '100%', backgroundColor: '#f59e0b', opacity: 0.3 }}></div>
-                            <div style={{ position: 'absolute', left: '70%', width: '30%', height: '100%', backgroundColor: '#ef4444', opacity: 0.3, borderRadius: '0 2px 2px 0' }}></div>
+                            {/* Static Zoned Background - No overlapping active fill */}
+                            <div style={{ position: 'absolute', left: '0%', width: '15%', height: '100%', backgroundColor: '#10b981', opacity: 0.4, borderRadius: '3px 0 0 3px' }}></div>
+                            <div style={{ position: 'absolute', left: '15%', width: '55%', height: '100%', backgroundColor: '#f59e0b', opacity: 0.4 }}></div>
+                            <div style={{ position: 'absolute', left: '70%', width: '30%', height: '100%', backgroundColor: '#ef4444', opacity: 0.4, borderRadius: '0 3px 3px 0' }}></div>
                             
-                            {/* Threshold Markers */}
-                            <div style={{ position: 'absolute', left: '15%', top: '-4px', bottom: '-4px', width: '1px', backgroundColor: 'rgba(255,255,255,0.5)' }}></div>
-                            <div style={{ position: 'absolute', left: '70%', top: '-4px', bottom: '-4px', width: '1px', backgroundColor: 'rgba(255,255,255,0.5)' }}></div>
+                            {/* Explicit Zone Dividers */}
+                            <div style={{ position: 'absolute', left: '15%', top: '0', bottom: '0', width: '2px', backgroundColor: '#050505' }}></div>
+                            <div style={{ position: 'absolute', left: '70%', top: '0', bottom: '0', width: '2px', backgroundColor: '#050505' }}></div>
                             
-                            {/* Active Value Fill */}
-                            <div style={{ position: 'absolute', left: '0%', width: `${(vitProb as number) * 100}%`, height: '100%', backgroundColor: probColor, borderRadius: '2px', transition: 'width 0.4s ease, background-color 0.4s ease' }}></div>
+                            {/* Explicit Percentage Labels mapped perfectly underneath */}
+                            <div style={{ position: 'absolute', left: '0%', top: '12px', fontSize: '9px', color: 'var(--text-muted)' }}>0%</div>
+                            <div style={{ position: 'absolute', left: '15%', top: '12px', transform: 'translateX(-50%)', fontSize: '9px', color: 'var(--text-muted)' }}>15%</div>
+                            <div style={{ position: 'absolute', left: '70%', top: '12px', transform: 'translateX(-50%)', fontSize: '9px', color: 'var(--text-muted)' }}>70%</div>
+                            <div style={{ position: 'absolute', left: '100%', top: '12px', transform: 'translateX(-100%)', fontSize: '9px', color: 'var(--text-muted)' }}>100%</div>
                           </>
                         )}
+                        {/* The Actual Slider Marker (Needle) */}
                         {typeof vitProb === 'number' && (
-                          <div style={{ position: 'absolute', left: `${vitProb * 100}%`, top: '-4px', bottom: '-4px', width: '2px', backgroundColor: '#fff', boxShadow: '0 0 6px rgba(255,255,255,0.9)', zIndex: 2, transform: 'translateX(-50%)' }}></div>
+                          <div style={{ position: 'absolute', left: `${vitProb * 100}%`, top: '-6px', bottom: '-6px', width: '3px', backgroundColor: '#fff', boxShadow: '0 0 8px rgba(255,255,255,1)', zIndex: 2, transform: 'translateX(-50%)', borderRadius: '1px' }}></div>
                         )}
                       </div>
                     </div>
                     
-                    <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', paddingLeft: '16px' }}>
                       <div style={{ marginBottom: '10px' }}>PROBABILITY SCORE</div>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                        <span style={{color: probColor, fontSize: '14px', fontWeight: 600}}>
+                        <span style={{color: probColor, fontSize: '16px', fontWeight: 600}}>
                           {typeof vitProb === 'number' ? `${(vitProb * 100).toFixed(1)}%` : '--'}
                         </span>
-                        <span style={{ fontSize: '9px', color: probColor, opacity: 0.8 }}>
+                        <span style={{ fontSize: '10px', color: probColor, opacity: 0.8, fontWeight: 600 }}>
                           {probText}
                         </span>
                       </div>
