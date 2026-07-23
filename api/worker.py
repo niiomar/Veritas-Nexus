@@ -14,7 +14,7 @@ logger = logging.getLogger("NSB-Platform-Worker")
 VIT_CORE_URL = os.getenv("VIT_CORE_URL", "http://host.docker.internal:8001/api/v1/analyze")
 VIT_CORE_API_KEY = os.getenv("VIT_CORE_API_KEY", "vitcore_forensics_secure_token_2026")
 C2PA_URL = os.getenv("C2PA_URL", "http://host.docker.internal:8002/api/v1/verify") 
-C2PA_API_KEY = os.getenv("C2PA_API_KEY", "vitcore_c2pa_secure_token_2026")
+C2PA_API_KEY = os.getenv("C2PA_API_KEY", "IUHEWRUHIJKLSBXBMNM-XHXBNV9885IKDUF")
 
 def call_vit_core_microservice(file_path: str) -> float:
     logger.info(f"Uploading asset to ViT-CORE engine at {VIT_CORE_URL}...")
@@ -31,7 +31,11 @@ def call_vit_core_microservice(file_path: str) -> float:
 
 def verify_c2pa_provenance(file_path: str) -> dict:
     logger.info(f"Uploading asset to C2PA-Veritas engine at {C2PA_URL}...")
-    headers = { "X-API-KEY": C2PA_API_KEY, "accept": "application/json" }
+    
+    headers = { 
+        "X-API-KEY": C2PA_API_KEY, 
+        "accept": "application/json" 
+    }
     
     try:
         with open(file_path, "rb") as f:
@@ -68,17 +72,14 @@ def verify_c2pa_provenance(file_path: str) -> dict:
             if "c2pa.actions" in assertion.get("label", ""):
                 for act in assertion.get("data", {}).get("actions", []):
                     agent = act.get("softwareAgent", {})
-                    agent_name = agent.get("name") if isinstance(agent, dict) else str(agent) if agent else claim_generator
-                    act_name = act.get("action", "Unknown").split(".")[-1].title()
                     
-                    # Prevent raw nulls from bleeding into the JSON report
-                    if not agent_name or agent_name == "None" or agent_name == "null":
-                        agent_name = "Not specified"
+                    agent_name = agent.get("name") if isinstance(agent, dict) else str(agent) if agent else "Unknown"
+                    act_name = act.get("action", "Unknown").split(".")[-1].title()
                     
                     history.append({
                         "action": act_name,
                         "agent": agent_name,
-                        "timestamp": act.get("when", timestamp),
+                        "timestamp": act.get("when", "--"), 
                         "description": act.get("digitalSourceType", "Asset event recorded.").split("/")[-1]
                     })
                     
@@ -142,7 +143,7 @@ async def execute_correlation_engine(job_id: str, evidence_id: str, session):
             "issuer": None, "algorithm": None, "timestamp": None, "manifest_history": []
         }
     
-    # STRICT ZERO-TRUST POLICY MATRIX
+    # 3. STRICT ZERO-TRUST POLICY MATRIX
     if real_probability is None:
         if c2pa_data["is_signed"] and c2pa_data["status"] == "VALID":
             disposition = "TRUSTED - Verified via Cryptographic Provenance (Neural Engine Bypassed)."
