@@ -48,9 +48,9 @@ export interface Evidence {
   status: EvidenceStatus;
   storage_uri: string;
   uploaded_by: string;
-  uploaded_at: string; // <-- CORRECTLY PLACED HERE
-  created_at?: string; // <-- CORRECTLY PLACED HERE
-  upload_date?: string; // (Kept optional just in case your backend still sends this)
+  uploaded_at: string; 
+  created_at?: string; 
+  upload_date?: string; 
   ai_report: AIReport | null;
 }
 
@@ -62,7 +62,6 @@ export interface EvidenceAssessment {
   type: AssessmentType;
   msg: string;
   policy: string;
-  // <-- UPLOADED_AT AND CREATED_AT HAVE BEEN REMOVED FROM HERE
 }
 
 export interface EngineStatus {
