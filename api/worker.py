@@ -16,20 +16,26 @@ C2PA_URL = os.getenv("C2PA_URL", "http://host.docker.internal:8002/api/v1/verify
 C2PA_API_KEY = os.getenv("C2PA_API_KEY", "IUHEWRUHIJKLSBXBMNM-XHXBNV9885IKDUF")
 
 def is_valid_visual_media(file_path: str) -> bool:
-    """Foolproof magic-byte checker that proves a file is visual media, regardless of its extension."""
+    """Foolproof magic-byte checker that proves a file is visual media and explicitly rejects audio."""
     try:
         with open(file_path, 'rb') as f:
-            header = f.read(12)
+            header = f.read(24) # Read deep enough to catch container types
             
         # Common Image Headers
         if header.startswith(b'\xff\xd8\xff'): return True # JPEG
         if header.startswith(b'\x89PNG\r\n\x1a\n'): return True # PNG
         if header.startswith(b'GIF8'): return True # GIF
-        if header.startswith(b'RIFF') and b'WEBP' in header: return True # WebP
         
+        # WebP / RIFF containers
+        if header.startswith(b'RIFF'):
+            if b'WAVE' in header: return False # Explicitly reject WAV audio
+            if b'WEBP' in header: return True
+            
         # Common Video Headers (Look for 'ftyp' atom in MP4/MOV)
-        if b'ftyp' in header: return True 
-        
+        if b'ftyp' in header:
+            if b'M4A ' in header: return False # Explicitly reject Apple Audio (M4A) masquerading as MP4
+            return True 
+            
         return False
     except Exception:
         return False
@@ -141,7 +147,7 @@ async def execute_correlation_engine(job_id: str, evidence_id: str, session):
     
     # 1. STRICT MAGIC-BYTE GATEKEEPER
     if not is_valid_visual_media(file_path):
-        logger.warning(f"[JOB {job_id}] Rejected non-visual media payload. Magic bytes check failed.")
+        logger.error(f"[JOB {job_id}] 🚨 MEDIA REJECTED: Binary header indicates {file_path} is an unsupported format.")
         report_data = {
             "deepfake_probability": None,
             "c2pa_data": None,
@@ -226,7 +232,7 @@ async def execute_correlation_engine(job_id: str, evidence_id: str, session):
     logger.info(f"[JOB {job_id}] Correlation Assessment complete.")
 
 async def poll_analysis_jobs():
-    logger.info("NSB Intelligence Worker is online...")
+    logger.info("NSB Intelligence Worker is online and awaiting visual media...")
     while True:
         try:
             async with async_session_maker() as session:
@@ -244,3 +250,10 @@ async def poll_analysis_jobs():
         except Exception as e:
             logger.error(f"Worker Error: {str(e)}")
             await asyncio.sleep(5)
+
+# ADDED: This block allows the script to actually run when you execute 'python worker.py'
+if __name__ == "__main__":
+    try:
+        asyncio.run(poll_analysis_jobs())
+    except KeyboardInterrupt:
+        logger.info("Worker cleanly shut down by user.")
