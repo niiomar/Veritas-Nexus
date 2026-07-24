@@ -34,6 +34,19 @@ export const AssessmentEngine = {
       };
     }
     
+    // STRICT REJECTION BYPASS
+    if (evidence.ai_report.platform_status === 'REJECTED') {
+      return {
+        verdict: 'REJECTED' as any,
+        conf: 'N/A',
+        type: 'neutral',
+        msg: 'System Gatekeeper Activated',
+        policy: 'Format Rejection',
+        domains: [],
+        totalScore: 0
+      };
+    }
+    
     const prob = evidence.ai_report.deepfake_probability;
     const c2pa = evidence.ai_report.c2pa_data;
     // @ts-ignore
@@ -203,7 +216,7 @@ export const AssessmentEngine = {
         conf: totalScore.toFixed(1),
         type,
         msg,
-        policy: "Weighted_XAI_v4.6",
+        policy: "Weighted_XAI_v4.7",
         domains: [
             { name: 'Cryptographic Provenance', score: provScore, max: 30, weight: 30, evidence: provEv },
             { name: 'AI Authenticity', score: aiScore, max: 25, weight: 25, evidence: aiEv },
