@@ -77,7 +77,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {caseEv.length} ASSETS
                 </div>
                 
-                {/* Corrects any wrapping/overlap issue) */}
+                {/* BULLETPROOF UI GRID */}
                 <div style={{ 
                   display: 'grid', 
                   gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', 
@@ -94,7 +94,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </div>
                   
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: stats.unverified > 0 ? '#cbd5e1' : 'rgba(255,255,255,0.1)', flexShrink: 0 }}></div>
+                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: stats.unverified > 0 ? '#38bdf8' : 'rgba(255,255,255,0.1)', flexShrink: 0, boxShadow: stats.unverified > 0 ? '0 0 8px rgba(56,189,248,0.4)' : 'none' }}></div>
                     <div style={{ fontSize: '10px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       <span style={{color: stats.unverified > 0 ? 'var(--text-main)' : 'var(--text-faint)'}}>{stats.unverified}</span> Unverified
                     </div>
