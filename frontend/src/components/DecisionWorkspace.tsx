@@ -42,7 +42,7 @@ const syntaxHighlight = (json: any) => {
 const getNodeStyle = (action: string) => {
   const act = (action || '').toLowerCase();
   if (act.includes('origin') || act.includes('created')) return { color: '#eab308', Icon: Disc }; 
-  if (act.includes('convert') || act.includes('edit') || act.includes('unbound')) return { color: '#8b5cf6', Icon: Edit2 }; 
+  if (act.includes('convert') || act.includes('edit') || act.includes('unbound')) return { color: '#a855f7', Icon: Edit2 }; 
   if (act.includes('sign')) return { color: '#38bdf8', Icon: Lock }; 
   if (act.includes('verif')) return { color: '#22c55e', Icon: ShieldCheck }; 
   return { color: '#94a3b8', Icon: Circle }; 
@@ -90,7 +90,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
   } else if (finalVerdict === 'INCONCLUSIVE') {
     themeColor = '#64748b'; // Dimmed Slate
   } else if (finalVerdict === 'REJECTED') {
-    themeColor = '#8b5cf6'; // Vivid Violet for Rejection
+    themeColor = '#a855f7'; // Vivid Purple for Rejection
   } else if (finalVerdict === 'UNVERIFIED' || finalVerdict === 'UNKNOWN') {
     themeColor = '#cbd5e1'; // Stronger, brighter silver for Unverified
   } else if (assessment.type === 'review') {
@@ -383,7 +383,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
                   fontWeight: mainTab === tab.id ? 600 : 500,
                   letterSpacing: '0.15em', 
                   color: mainTab === tab.id ? 'var(--text-main)' : 'var(--text-muted)',
-                  borderBottom: mainTab === tab.id ? '2px solid #3b82f6' : '2px solid transparent',
+                  borderBottom: mainTab === tab.id ? `2px solid ${themeColor}` : '2px solid transparent',
                   transition: 'color 0.2s, border-bottom-color 0.2s',
                   outline: 'none'
                 }}
@@ -421,7 +421,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
                           if (imageFailed) setImageFailed(false);
                         }}
                         className="mono hover-bright"
-                        style={{ flex: '1 0 auto', padding: '20px 24px', background: 'transparent', border: 'none', borderBottom: imageTab === tab ? '2px solid #3b82f6' : '2px solid transparent', color: imageTab === tab ? 'var(--text-main)' : 'var(--text-muted)', fontSize: '11px', letterSpacing: '0.15em', cursor: 'pointer', transition: 'all 0.2s' }}
+                        style={{ flex: '1 0 auto', padding: '20px 24px', background: 'transparent', border: 'none', borderBottom: imageTab === tab ? `2px solid ${themeColor}` : '2px solid transparent', color: imageTab === tab ? 'var(--text-main)' : 'var(--text-muted)', fontSize: '11px', letterSpacing: '0.15em', cursor: 'pointer', transition: 'all 0.2s' }}
                       >{tab}</button>
                     ))}
                   </div>
@@ -431,8 +431,8 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
                     {/* REJECTED STATE OVERLAY */}
                     {finalVerdict === 'REJECTED' ? (
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', zIndex: 10 }}>
-                        <div className="mono" style={{ color: 'var(--text-muted)', fontSize: '11px', letterSpacing: '0.15em' }}>⚠ MEDIA FORMAT REJECTED</div>
-                        <div style={{ color: 'var(--text-faint)', fontSize: '11px', textAlign: 'center', maxWidth: '300px', lineHeight: 1.6 }}>
+                        <div className="mono" style={{ color: themeColor, fontSize: '11px', letterSpacing: '0.15em' }}>⚠ MEDIA FORMAT REJECTED</div>
+                        <div style={{ color: 'var(--text-muted)', fontSize: '11px', textAlign: 'center', maxWidth: '300px', lineHeight: 1.6 }}>
                           This asset format is not supported by the visual forensic pipeline. Only images and videos can be analyzed.
                         </div>
                       </div>
