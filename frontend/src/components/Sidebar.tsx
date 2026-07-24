@@ -48,7 +48,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               } else if (verdict === 'INCONCLUSIVE') {
                 acc.inconclusive++;
               } else {
-                // Catches UNVERIFIED, UNKNOWN, and standard/pending images
                 acc.unverified++;
               }
               return acc;
@@ -79,37 +78,44 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {caseEv.length} ASSETS
                 </div>
                 
-                {/* 6-TIER UI GRID*/}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '11px' }} className="mono">
+                {/* REFACTORED 6-TIER UI GRID (Fixed Wrapping) */}
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', 
+                  rowGap: '10px', 
+                  columnGap: '8px', 
+                  fontSize: '10px', 
+                  whiteSpace: 'nowrap' 
+                }} className="mono">
                   
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: stats.verified > 0 ? '#10b981' : 'rgba(255,255,255,0.1)' }}></div>
                     <span style={{ color: 'var(--text-muted)' }}><span style={{color: stats.verified > 0 ? 'var(--text-main)' : 'var(--text-faint)'}}>{stats.verified}</span> Verified</span>
                   </div>
                   
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: stats.unverified > 0 ? '#cbd5e1' : 'rgba(255,255,255,0.1)' }}></div>
                     <span style={{ color: 'var(--text-muted)' }}><span style={{color: stats.unverified > 0 ? 'var(--text-main)' : 'var(--text-faint)'}}>{stats.unverified}</span> Unverified</span>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: stats.conflict > 0 ? '#f59e0b' : 'rgba(255,255,255,0.1)', boxShadow: stats.conflict > 0 ? '0 0 8px rgba(245,158,11,0.4)' : 'none' }}></div>
                     <span style={{ color: 'var(--text-muted)' }}><span style={{color: stats.conflict > 0 ? 'var(--text-main)' : 'var(--text-faint)'}}>{stats.conflict}</span> Conflict</span>
                   </div>
                   
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: stats.critical > 0 ? '#ef4444' : 'rgba(255,255,255,0.1)', boxShadow: stats.critical > 0 ? '0 0 8px rgba(239,68,68,0.4)' : 'none' }}></div>
                     <span style={{ color: 'var(--text-muted)' }}><span style={{color: stats.critical > 0 ? 'var(--text-main)' : 'var(--text-faint)'}}>{stats.critical}</span> Critical</span>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: stats.inconclusive > 0 ? '#64748b' : 'rgba(255,255,255,0.1)' }}></div>
-                    <span style={{ color: 'var(--text-muted)' }}><span style={{color: stats.inconclusive > 0 ? 'var(--text-main)' : 'var(--text-faint)'}}>{stats.inconclusive}</span> Inconclusive</span>
+                    <span style={{ color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis' }}><span style={{color: stats.inconclusive > 0 ? 'var(--text-main)' : 'var(--text-faint)'}}>{stats.inconclusive}</span> Inconclusive</span>
                   </div>
 
-                  {/* REJECTED STATE */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: stats.rejected > 0 ? '#94a3b8' : 'rgba(255,255,255,0.1)' }}></div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {/* NEW COLOR: Vivid Violet for Rejected */}
+                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: stats.rejected > 0 ? '#8b5cf6' : 'rgba(255,255,255,0.1)' }}></div>
                     <span style={{ color: 'var(--text-muted)' }}><span style={{color: stats.rejected > 0 ? 'var(--text-main)' : 'var(--text-faint)'}}>{stats.rejected}</span> Rejected</span>
                   </div>
 
