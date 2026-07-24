@@ -6,7 +6,6 @@ from uuid import uuid4
 
 from application.ports.services import IStorageService
 
-
 class LocalStorageService(IStorageService):
     """
     Local filesystem implementation of the storage service.
