@@ -8,7 +8,6 @@ from domain.engines.base import IAnalysisEngine
 
 logger = logging.getLogger(__name__)
 
-
 class EngineRegistry:
     """
     The central discovery and execution hub for forensic plugins.
