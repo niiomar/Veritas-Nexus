@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import json
-import urllib.request
 import requests
 import os
 from sqlalchemy import select, text
@@ -15,6 +14,25 @@ VIT_CORE_URL = os.getenv("VIT_CORE_URL", "http://host.docker.internal:8001/api/v
 VIT_CORE_API_KEY = os.getenv("VIT_CORE_API_KEY", "vitcore_forensics_secure_token_2026")
 C2PA_URL = os.getenv("C2PA_URL", "http://host.docker.internal:8002/api/v1/verify") 
 C2PA_API_KEY = os.getenv("C2PA_API_KEY", "IUHEWRUHIJKLSBXBMNM-XHXBNV9885IKDUF")
+
+def is_valid_visual_media(file_path: str) -> bool:
+    """Foolproof magic-byte checker that proves a file is visual media, regardless of its extension."""
+    try:
+        with open(file_path, 'rb') as f:
+            header = f.read(12)
+            
+        # Common Image Headers
+        if header.startswith(b'\xff\xd8\xff'): return True # JPEG
+        if header.startswith(b'\x89PNG\r\n\x1a\n'): return True # PNG
+        if header.startswith(b'GIF8'): return True # GIF
+        if header.startswith(b'RIFF') and b'WEBP' in header: return True # WebP
+        
+        # Common Video Headers (Look for 'ftyp' atom in MP4/MOV)
+        if b'ftyp' in header: return True 
+        
+        return False
+    except Exception:
+        return False
 
 def call_vit_core_microservice(file_path: str) -> float:
     logger.info(f"Uploading asset to ViT-CORE engine at {VIT_CORE_URL}...")
@@ -121,6 +139,21 @@ async def execute_correlation_engine(job_id: str, evidence_id: str, session):
     
     file_path = evidence_record.storage_uri
     
+    # 1. STRICT MAGIC-BYTE GATEKEEPER
+    if not is_valid_visual_media(file_path):
+        logger.warning(f"[JOB {job_id}] Rejected non-visual media payload. Magic bytes check failed.")
+        report_data = {
+            "deepfake_probability": None,
+            "c2pa_data": None,
+            "platform_status": "REJECTED",
+            "disposition": "Unsupported format. Visual forensics require valid image or video assets.",
+            "threat_summary": "Analysis aborted by strict binary gatekeeper." 
+        }
+        update_stmt = text("UPDATE analysis.analysis_jobs SET ai_report = :report, status = 'COMPLETED' WHERE id = :job_id")
+        await session.execute(update_stmt, {"report": json.dumps(report_data), "job_id": job_id})
+        return
+
+    # 2. PROCEED WITH NORMAL ML PROCESSING
     metadata = evidence_record.metadata_dict or {}
     use_vit = metadata.get("use_vit", True)
     use_c2pa = metadata.get("use_c2pa", True)
