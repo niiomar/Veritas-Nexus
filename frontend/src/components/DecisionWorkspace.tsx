@@ -90,7 +90,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
   } else if (finalVerdict === 'INCONCLUSIVE') {
     themeColor = '#64748b'; // Dimmed Slate
   } else if (finalVerdict === 'REJECTED') {
-    themeColor = '#94a3b8'; // Neutral Slate for Rejection
+    themeColor = '#8b5cf6'; // Vivid Violet for Rejection
   } else if (finalVerdict === 'UNVERIFIED' || finalVerdict === 'UNKNOWN') {
     themeColor = '#cbd5e1'; // Stronger, brighter silver for Unverified
   } else if (assessment.type === 'review') {
@@ -428,7 +428,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
 
                   <div style={{ width: '100%', height: '55vh', minHeight: '450px', backgroundColor: '#000', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                     
-                    {/* NEW: REJECTED STATE OVERLAY */}
+                    {/* REJECTED STATE OVERLAY */}
                     {finalVerdict === 'REJECTED' ? (
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', zIndex: 10 }}>
                         <div className="mono" style={{ color: 'var(--text-muted)', fontSize: '11px', letterSpacing: '0.15em' }}>⚠ MEDIA FORMAT REJECTED</div>
@@ -925,7 +925,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
               </div>
             )}
 
-          </div>a
+          </div>
         </div>
       )}
     </div>
