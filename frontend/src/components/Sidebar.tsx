@@ -78,7 +78,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {caseEv.length} ASSETS
                 </div>
                 
-                {/* REFACTORED 6-TIER UI GRID (Fixed Wrapping) */}
+                {/* 6-TIER UI GRID */}
                 <div style={{ 
                   display: 'grid', 
                   gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', 
@@ -114,7 +114,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    {/* NEW COLOR: Vivid Violet for Rejected */}
+                    
+                    {/*  Vivid Violet for Rejected */}
                     <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: stats.rejected > 0 ? '#8b5cf6' : 'rgba(255,255,255,0.1)' }}></div>
                     <span style={{ color: 'var(--text-muted)' }}><span style={{color: stats.rejected > 0 ? 'var(--text-main)' : 'var(--text-faint)'}}>{stats.rejected}</span> Rejected</span>
                   </div>
