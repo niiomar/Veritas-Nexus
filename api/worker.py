@@ -3,6 +3,7 @@ import logging
 import json
 import requests
 import os
+import mimetypes
 from sqlalchemy import select, text
 from infrastructure.persistence.database import async_session_maker
 from infrastructure.persistence.models import AnalysisJobORM, EvidenceORM
@@ -16,24 +17,31 @@ C2PA_URL = os.getenv("C2PA_URL", "http://host.docker.internal:8002/api/v1/verify
 C2PA_API_KEY = os.getenv("C2PA_API_KEY", "IUHEWRUHIJKLSBXBMNM-XHXBNV9885IKDUF")
 
 def is_valid_visual_media(file_path: str) -> bool:
-    """Foolproof magic-byte checker that proves a file is visual media and explicitly rejects audio."""
+    """Multi-layered gatekeeper combining extension, mime, and magic bytes."""
+    # 1. Hard block known audio extensions
+    _, ext = os.path.splitext(file_path.lower())
+    if ext in {'.m4a', '.mp3', '.wav', '.flac', '.aac', '.ogg', '.wma'}:
+        return False
+        
+    # 2. Hard block audio mimetypes
+    mime_type, _ = mimetypes.guess_type(file_path)
+    if mime_type and mime_type.startswith('audio/'):
+        return False
+
+    # 3. Magic-Byte Fallback
     try:
         with open(file_path, 'rb') as f:
-            header = f.read(24) # Read deep enough to catch container types
+            header = f.read(24)
             
-        # Common Image Headers
         if header.startswith(b'\xff\xd8\xff'): return True # JPEG
         if header.startswith(b'\x89PNG\r\n\x1a\n'): return True # PNG
         if header.startswith(b'GIF8'): return True # GIF
+        if header.startswith(b'RIFF') and b'WEBP' in header: return True # WebP
         
-        # WebP / RIFF containers
-        if header.startswith(b'RIFF'):
-            if b'WAVE' in header: return False # Explicitly reject WAV audio
-            if b'WEBP' in header: return True
-            
-        # Common Video Headers (Look for 'ftyp' atom in MP4/MOV)
+        # Block known audio brands inside MP4 containers
         if b'ftyp' in header:
-            if b'M4A ' in header: return False # Explicitly reject Apple Audio (M4A) masquerading as MP4
+            if b'M4A ' in header or b'M4B ' in header or b'M4P ' in header: 
+                return False
             return True 
             
         return False
@@ -47,24 +55,30 @@ def call_vit_core_microservice(file_path: str) -> float:
         with open(file_path, "rb") as f:
             files = {"file": (os.path.basename(file_path), f)}
             response = requests.post(VIT_CORE_URL, files=files, headers=headers, params={"explain": "false"}, timeout=120)
+        
+        # NEW: Explicitly catch 400 Bad Request format rejections from the microservice
+        if response.status_code == 400:
+            raise ValueError(f"Format Rejected: {response.text}")
+            
         response.raise_for_status()
         return float(response.json()["probability"])
+    except ValueError as ve:
+        raise ve # Pass explicit rejections up the chain to abort the job
     except Exception as e:
         logger.error(f"ViT-CORE bypassed or offline: {str(e)}")
-        raise e
+        raise RuntimeError(str(e))
 
 def verify_c2pa_provenance(file_path: str) -> dict:
     logger.info(f"Uploading asset to C2PA-Veritas engine at {C2PA_URL}...")
-    
-    headers = { 
-        "X-API-KEY": C2PA_API_KEY, 
-        "accept": "application/json" 
-    }
+    headers = { "X-API-KEY": C2PA_API_KEY, "accept": "application/json" }
     
     try:
         with open(file_path, "rb") as f:
             files = {"file": (os.path.basename(file_path), f)}
             response = requests.post(C2PA_URL, files=files, headers=headers, timeout=30)
+            
+        if response.status_code == 400:
+            raise ValueError("C2PA Engine rejected format.")
             
         response.raise_for_status()
         data = response.json()
@@ -88,15 +102,12 @@ def verify_c2pa_provenance(file_path: str) -> dict:
         timestamp = sig_info.get("time", "--")
         
         cgi = active_mdata.get("claim_generator_info", [])
-        claim_generator = cgi[0].get("name", "Unknown Source") if cgi else active_mdata.get("claim_generator", "Unknown Source")
         
         history = []
-        
         for assertion in active_mdata.get("assertions", []):
             if "c2pa.actions" in assertion.get("label", ""):
                 for act in assertion.get("data", {}).get("actions", []):
                     agent = act.get("softwareAgent", {})
-                    
                     agent_name = agent.get("name") if isinstance(agent, dict) else str(agent) if agent else "Unknown"
                     act_name = act.get("action", "Unknown").split(".")[-1].title()
                     
@@ -108,16 +119,11 @@ def verify_c2pa_provenance(file_path: str) -> dict:
                     })
                     
         history.append({
-            "action": "Signed",
-            "agent": issuer,
-            "timestamp": timestamp,
+            "action": "Signed", "agent": issuer, "timestamp": timestamp,
             "description": f"Cryptographic signature applied via {alg}."
         })
-        
         history.append({
-            "action": "Verified",
-            "agent": "C2PA Veritas",
-            "timestamp": "Present",
+            "action": "Verified", "agent": "C2PA Veritas", "timestamp": "Present",
             "description": "Ledger validation complete."
         })
 
@@ -131,9 +137,9 @@ def verify_c2pa_provenance(file_path: str) -> dict:
             "manifest_history": history
         }
     except Exception as e:
-        logger.warning(f"C2PA engine fetch failed: {str(e)}")
+        logger.warning(f"C2PA engine fetch failed or rejected: {str(e)}")
         return {
-            "is_signed": False, "status": "UNSIGNED", "raw_status": "Engine Offline",
+            "is_signed": False, "status": "UNSIGNED", "raw_status": "Engine Offline or Rejected",
             "issuer": None, "algorithm": None, "timestamp": None, "manifest_history": []
         }
 
@@ -145,13 +151,11 @@ async def execute_correlation_engine(job_id: str, evidence_id: str, session):
     
     file_path = evidence_record.storage_uri
     
-    # 1. STRICT MAGIC-BYTE GATEKEEPER
+    # 1. STRICT MULTI-LAYER GATEKEEPER
     if not is_valid_visual_media(file_path):
-        logger.error(f"[JOB {job_id}] 🚨 MEDIA REJECTED: Binary header indicates {file_path} is an unsupported format.")
+        logger.error(f"[JOB {job_id}] 🚨 MEDIA REJECTED: Multi-layer inspection indicates unsupported format.")
         report_data = {
-            "deepfake_probability": None,
-            "c2pa_data": None,
-            "platform_status": "REJECTED",
+            "deepfake_probability": None, "c2pa_data": None, "platform_status": "REJECTED",
             "disposition": "Unsupported format. Visual forensics require valid image or video assets.",
             "threat_summary": "Analysis aborted by strict binary gatekeeper." 
         }
@@ -167,6 +171,17 @@ async def execute_correlation_engine(job_id: str, evidence_id: str, session):
     if use_vit:
         try:
             real_probability = await asyncio.to_thread(call_vit_core_microservice, file_path)
+        except ValueError as ve:
+            # EXPLICIT 400 REJECTION INTERCEPTOR
+            logger.error(f"[JOB {job_id}] 🚨 MEDIA REJECTED BY ViT-CORE: {str(ve)}")
+            report_data = {
+                "deepfake_probability": None, "c2pa_data": None, "platform_status": "REJECTED",
+                "disposition": "Media rejected by neural engine. Supported visual container but no viable subjects/frames detected.",
+                "threat_summary": "Analysis aborted by Neural Engine." 
+            }
+            update_stmt = text("UPDATE analysis.analysis_jobs SET ai_report = :report, status = 'COMPLETED' WHERE id = :job_id")
+            await session.execute(update_stmt, {"report": json.dumps(report_data), "job_id": job_id})
+            return
         except Exception:
             real_probability = None 
     else:
@@ -206,7 +221,7 @@ async def execute_correlation_engine(job_id: str, evidence_id: str, session):
                 status_flag = "UNVERIFIED"
         elif real_probability < 0.70:
             if c2pa_data["is_signed"] and c2pa_data["status"] == "VALID":
-                disposition = "CRITICAL CONFLICT - Valid cryptography but neural anomalies detected. Possible deepfake injection."
+                disposition = "CRITICAL CONFLICT - Valid cryptography but neural anomalies detected."
                 status_flag = "CONFLICT"
             else:
                 disposition = "REVIEW REQUIRED - Minor synthetic anomalies detected."
@@ -251,7 +266,6 @@ async def poll_analysis_jobs():
             logger.error(f"Worker Error: {str(e)}")
             await asyncio.sleep(5)
 
-# ADDED: This block allows the script to actually run when you execute 'python worker.py'
 if __name__ == "__main__":
     try:
         asyncio.run(poll_analysis_jobs())
