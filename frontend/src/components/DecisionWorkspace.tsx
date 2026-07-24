@@ -76,7 +76,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
   const isC2paBypassed = c2pa?.raw_status === "Bypassed by User";
   const isC2paBroken = c2pa?.status === "BROKEN_SIGNATURE";
   
-  // --- SYNCHRONIZED DOSSIER THEME LOGIC ---
+  // SYNCHRONIZED DOSSIER THEME LOGIC
   const finalVerdict = platformStatus === 'REJECTED' ? 'REJECTED' :
                        platformStatus === 'CONFLICT' ? 'CONFLICT' : 
                        platformStatus === 'CRITICAL THREAT' ? 'CRITICAL' : 
@@ -99,7 +99,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
     themeColor = 'var(--c-trust, #10b981)'; // Green
   }
 
-  // --- OVERRIDE BACKEND DISPOSITION STRING ---
+  // OVERRIDE BACKEND DISPOSITION STRING 
   let dispositionText = evidence?.ai_report?.disposition || 'Analysis complete.';
   
   if (dispositionText.includes('bypassed/offline')) {
@@ -118,7 +118,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
     dispositionText = 'No cryptographic signature found; neural inference unavailable (no viable subject).';
   }
 
-  // --- DYNAMIC SUBTEXT FORMATTER ---
+  // DYNAMIC SUBTEXT FORMATTER
   let finalSubtext = `${assessment.msg} — ${dispositionText}`;
   if (platformStatus === 'CONFLICT' || platformStatus === 'CRITICAL THREAT' || platformStatus === 'REJECTED') {
     finalSubtext = dispositionText;
@@ -134,13 +134,13 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
     }
   }
 
-  // --- GAUGE CALCULATIONS ---
+  // GAUGE CALCULATIONS
   const confValue = assessment.conf !== 'N/A' ? parseFloat(assessment.conf as string) : 0;
   const gaugeRadius = 13;
   const gaugeCircumference = 2 * Math.PI * gaugeRadius;
   const gaugeOffset = gaugeCircumference - (confValue / 100) * gaugeCircumference;
 
-  // --- FORENSIC DATA PREP FOR XAI UI ---
+  // FORENSIC DATA PREP FOR XAI UI
   const isClean = !isVitUnavailable && vitProb !== null && vitProb < 0.15;
   const isWarning = !isVitUnavailable && vitProb !== null && vitProb >= 0.15 && vitProb < 0.70;
   const isCritical = !isVitUnavailable && vitProb !== null && vitProb >= 0.70;
@@ -148,7 +148,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
   const probColor = isClean ? '#10b981' : isWarning ? '#f59e0b' : isCritical ? '#ef4444' : 'var(--text-muted)';
   const probText = isClean ? 'NOMINAL' : isWarning ? 'SUSPICIOUS' : isCritical ? 'CRITICAL' : 'N/A';
 
-  // --- TIMELINE FORENSIC REASONING CALCULATIONS ---
+  // TIMELINE FORENSIC REASONING CALCULATIONS
   const parseExifDate = (dateStr: string) => {
     if (!dateStr) return null;
     const normalized = dateStr.replace(/^(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3');
@@ -233,7 +233,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
     <div className="decision-workspace" style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', backgroundColor: '#050505', position: 'relative', overflow: 'hidden' }}>
       <style>{dossierStyles}</style>
       
-      {/* GLOBAL HEADER (Fixed at Top) */}
+      {/* GLOBAL HEADER*/}
       <div style={{ flexShrink: 0, padding: '12px 48px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div className="mono" style={{ fontSize: '10px', letterSpacing: '0.15em', fontWeight: 500, color: 'var(--text-faint)' }}>VERITAS NEXUS / DOSSIER</div>
         <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '10px', letterSpacing: '0.1em' }} className="mono hover-bright">CLOSE ✕</button>
@@ -242,7 +242,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
       {isEval ? (
         <div style={{ padding: '120px 48px', color: 'var(--text-muted)' }}><div className="mono animate-pulse" style={{ letterSpacing: '0.1em', fontSize: '14px' }}>EXECUTING FUSION PROTOCOLS...</div></div>
       ) : (
-        /* --- MAIN SCROLLABLE DOSSIER BODY --- */
+        /* MAIN SCROLLABLE DOSSIER BODY */
         <div className="animate-fade-in custom-scrollbar" style={{ display: 'flex', flexDirection: 'column', flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
           
           {/* STABLE INVESTIGATION CONTEXT */}
@@ -316,7 +316,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
             </div>
           </div>
 
-          {/* FULLY REFACTORED: COLLAPSIBLE XAI DOMAIN MATRIX */}
+          {/* COLLAPSIBLE XAI DOMAIN MATRIX */}
           {isMatrixExpanded && detailedAssessment.domains && detailedAssessment.domains.length > 0 && (
             <div className="animate-fade-in" style={{ flexShrink: 0, padding: '0 48px 16px 48px', backgroundColor: 'rgba(255,255,255,0.01)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', padding: '24px', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', backgroundColor: '#0a0a0c' }}>
