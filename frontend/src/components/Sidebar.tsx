@@ -31,13 +31,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
             const isActive = activeCase?.id === c.id;
             const caseEv = evidenceLibrary.filter(e => e.case_id === c.id);
             
-            // NEW 5-TIER STATS CALCULATION
+            // NEW 6-TIER STATS CALCULATION (Added Rejected)
             const stats = caseEv.reduce((acc, ev) => {
               const { verdict } = AssessmentEngine.evaluate(ev);
               const platformStatus = ev.ai_report?.platform_status;
               const c2paStatus = ev.ai_report?.c2pa_data?.status;
 
-              if (verdict === 'CRITICAL' || platformStatus === 'CRITICAL THREAT' || c2paStatus === 'BROKEN_SIGNATURE') {
+              if (platformStatus === 'REJECTED') {
+                acc.rejected++;
+              } else if (verdict === 'CRITICAL' || platformStatus === 'CRITICAL THREAT' || c2paStatus === 'BROKEN_SIGNATURE') {
                 acc.critical++;
               } else if (verdict === 'CONFLICT' || platformStatus === 'CONFLICT') {
                 acc.conflict++;
@@ -50,7 +52,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 acc.unverified++;
               }
               return acc;
-            }, { verified: 0, unverified: 0, conflict: 0, critical: 0, inconclusive: 0 });
+            }, { verified: 0, unverified: 0, conflict: 0, critical: 0, inconclusive: 0, rejected: 0 });
 
             return (
               <div key={c.id} onClick={() => onSelectCase(c)} style={{
@@ -77,8 +79,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {caseEv.length} ASSETS
                 </div>
                 
-                {/* 5-TIER UI GRID */}
+                {/* 6-TIER UI GRID (Now perfectly balanced) */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '11px' }} className="mono">
+                  
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: stats.verified > 0 ? '#10b981' : 'rgba(255,255,255,0.1)' }}></div>
                     <span style={{ color: 'var(--text-muted)' }}><span style={{color: stats.verified > 0 ? 'var(--text-main)' : 'var(--text-faint)'}}>{stats.verified}</span> Verified</span>
@@ -99,11 +102,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <span style={{ color: 'var(--text-muted)' }}><span style={{color: stats.critical > 0 ? 'var(--text-main)' : 'var(--text-faint)'}}>{stats.critical}</span> Critical</span>
                   </div>
 
-                  {/* INCONCLUSIVE STATE */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', gridColumn: '1 / -1' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: stats.inconclusive > 0 ? '#64748b' : 'rgba(255,255,255,0.1)' }}></div>
                     <span style={{ color: 'var(--text-muted)' }}><span style={{color: stats.inconclusive > 0 ? 'var(--text-main)' : 'var(--text-faint)'}}>{stats.inconclusive}</span> Inconclusive</span>
                   </div>
+
+                  {/* NEW REJECTED STATE */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: stats.rejected > 0 ? '#94a3b8' : 'rgba(255,255,255,0.1)' }}></div>
+                    <span style={{ color: 'var(--text-muted)' }}><span style={{color: stats.rejected > 0 ? 'var(--text-main)' : 'var(--text-faint)'}}>{stats.rejected}</span> Rejected</span>
+                  </div>
+
                 </div>
 
               </div>
