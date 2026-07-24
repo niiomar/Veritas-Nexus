@@ -92,7 +92,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
   } else if (finalVerdict === 'REJECTED') {
     themeColor = '#a855f7'; // Vivid Purple for Rejection
   } else if (finalVerdict === 'UNVERIFIED' || finalVerdict === 'UNKNOWN') {
-    themeColor = '#cbd5e1'; // Stronger, brighter silver for Unverified
+    themeColor = '#38bdf8'; // Sky Blue for Unverified
   } else if (assessment.type === 'review') {
     themeColor = 'var(--c-warn, #f59e0b)'; // Generic review fallback
   } else {
