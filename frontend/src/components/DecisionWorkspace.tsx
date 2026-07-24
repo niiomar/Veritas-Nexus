@@ -77,7 +77,8 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
   const isC2paBroken = c2pa?.status === "BROKEN_SIGNATURE";
   
   // --- SYNCHRONIZED DOSSIER THEME LOGIC ---
-  const finalVerdict = platformStatus === 'CONFLICT' ? 'CONFLICT' : 
+  const finalVerdict = platformStatus === 'REJECTED' ? 'REJECTED' :
+                       platformStatus === 'CONFLICT' ? 'CONFLICT' : 
                        platformStatus === 'CRITICAL THREAT' ? 'CRITICAL' : 
                        (assessment.verdict?.toUpperCase() || 'PENDING');
 
@@ -88,6 +89,8 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
     themeColor = 'var(--c-warn, #f59e0b)'; // Orange
   } else if (finalVerdict === 'INCONCLUSIVE') {
     themeColor = '#64748b'; // Dimmed Slate
+  } else if (finalVerdict === 'REJECTED') {
+    themeColor = '#94a3b8'; // Neutral Slate for Rejection
   } else if (finalVerdict === 'UNVERIFIED' || finalVerdict === 'UNKNOWN') {
     themeColor = '#cbd5e1'; // Stronger, brighter silver for Unverified
   } else if (assessment.type === 'review') {
@@ -117,7 +120,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
 
   // --- DYNAMIC SUBTEXT FORMATTER ---
   let finalSubtext = `${assessment.msg} — ${dispositionText}`;
-  if (platformStatus === 'CONFLICT' || platformStatus === 'CRITICAL THREAT') {
+  if (platformStatus === 'CONFLICT' || platformStatus === 'CRITICAL THREAT' || platformStatus === 'REJECTED') {
     finalSubtext = dispositionText;
   } else if (finalVerdict === 'CRITICAL') {
     finalSubtext = `Severe structural manipulation and metadata degradation detected. ${dispositionText}`;
@@ -287,6 +290,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
               
               <button 
                 onClick={() => setIsMatrixExpanded(!isMatrixExpanded)} 
+                disabled={finalVerdict === 'REJECTED'}
                 className="hover-bright mono" 
                 style={{ 
                   marginTop: '8px', 
@@ -296,7 +300,8 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
                   padding: '6px', 
                   fontSize: '9px', 
                   color: isMatrixExpanded ? 'var(--text-main)' : 'var(--text-muted)', 
-                  cursor: 'pointer', 
+                  cursor: finalVerdict === 'REJECTED' ? 'not-allowed' : 'pointer', 
+                  opacity: finalVerdict === 'REJECTED' ? 0.5 : 1,
                   display: 'flex', 
                   alignItems: 'center', 
                   justifyContent: 'center', 
@@ -306,16 +311,16 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
                 }}
               >
                  {isMatrixExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                 {isMatrixExpanded ? 'HIDE SCORING MATRIX' : 'VIEW SCORING MATRIX'}
+                 {finalVerdict === 'REJECTED' ? 'MATRIX UNAVAILABLE' : isMatrixExpanded ? 'HIDE SCORING MATRIX' : 'VIEW SCORING MATRIX'}
               </button>
             </div>
           </div>
 
           {/* FULLY REFACTORED: COLLAPSIBLE XAI DOMAIN MATRIX */}
-          {isMatrixExpanded && (
+          {isMatrixExpanded && detailedAssessment.domains && detailedAssessment.domains.length > 0 && (
             <div className="animate-fade-in" style={{ flexShrink: 0, padding: '0 48px 16px 48px', backgroundColor: 'rgba(255,255,255,0.01)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', padding: '24px', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', backgroundColor: '#0a0a0c' }}>
-                {detailedAssessment.domains?.map((domain: any, idx: number) => (
+                {detailedAssessment.domains.map((domain: any, idx: number) => (
                    <div key={idx} style={{ backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '6px', padding: '16px', display: 'flex', flexDirection: 'column' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                          <span style={{ fontSize: '11px', color: 'var(--text-faint)', letterSpacing: '0.05em' }} className="mono">
@@ -423,7 +428,15 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
 
                   <div style={{ width: '100%', height: '55vh', minHeight: '450px', backgroundColor: '#000', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                     
-                    {imageTab !== 'SOURCE' && isVitUnavailable ? (
+                    {/* NEW: REJECTED STATE OVERLAY */}
+                    {finalVerdict === 'REJECTED' ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', zIndex: 10 }}>
+                        <div className="mono" style={{ color: 'var(--text-muted)', fontSize: '11px', letterSpacing: '0.15em' }}>⚠ MEDIA FORMAT REJECTED</div>
+                        <div style={{ color: 'var(--text-faint)', fontSize: '11px', textAlign: 'center', maxWidth: '300px', lineHeight: 1.6 }}>
+                          This asset format is not supported by the visual forensic pipeline. Only images and videos can be analyzed.
+                        </div>
+                      </div>
+                    ) : imageTab !== 'SOURCE' && isVitUnavailable ? (
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', zIndex: 10 }}>
                         <div className="mono" style={{ color: 'var(--c-warn)', fontSize: '11px', letterSpacing: '0.15em' }}>⚠ ViT-CORE INFERENCE UNAVAILABLE</div>
                         <div style={{ color: 'var(--text-muted)', fontSize: '11px', textAlign: 'center', maxWidth: '300px', lineHeight: 1.6 }}>
@@ -912,7 +925,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
               </div>
             )}
 
-          </div>
+          </div>a
         </div>
       )}
     </div>
