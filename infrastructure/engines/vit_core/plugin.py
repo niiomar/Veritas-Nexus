@@ -9,7 +9,6 @@ from domain.engines.base import IAnalysisEngine
 # Hypothetical import from your existing ML codebase
 # from vit_core.inference import ViTDetector 
 
-
 class VitCoreEngine(IAnalysisEngine):
     def __init__(self):
         self._manifest = EngineManifest(
