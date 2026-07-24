@@ -4,6 +4,7 @@ import json
 import urllib.request
 import requests
 import os
+import mimetypes # NEW: Built-in library to check file types
 from sqlalchemy import select, text
 from infrastructure.persistence.database import async_session_maker
 from infrastructure.persistence.models import AnalysisJobORM, EvidenceORM
@@ -32,7 +33,6 @@ def call_vit_core_microservice(file_path: str) -> float:
 def verify_c2pa_provenance(file_path: str) -> dict:
     logger.info(f"Uploading asset to C2PA-Veritas engine at {C2PA_URL}...")
     
-    # Authentication headers correctly injected
     headers = { 
         "X-API-KEY": C2PA_API_KEY, 
         "accept": "application/json" 
@@ -41,7 +41,6 @@ def verify_c2pa_provenance(file_path: str) -> dict:
     try:
         with open(file_path, "rb") as f:
             files = {"file": (os.path.basename(file_path), f)}
-            # Headers passed into the post request
             response = requests.post(C2PA_URL, files=files, headers=headers, timeout=30)
             
         response.raise_for_status()
@@ -71,25 +70,19 @@ def verify_c2pa_provenance(file_path: str) -> dict:
         history = []
         
         for assertion in active_mdata.get("assertions", []):
-                if "c2pa.actions" in assertion.get("label", ""):
-                    for act in assertion.get("data", {}).get("actions", []):
-                        agent = act.get("softwareAgent", {})
-                        
-                        # 1. Allow "Unknown" to pass through naturally
-                        agent_name = agent.get("name") if isinstance(agent, dict) else str(agent) if agent else "Unknown"
-                        
-                        act_name = act.get("action", "Unknown").split(".")[-1].title()
-                        
-                        history.append({
-                            # Keep the raw action name (e.g., Converted, Unbound)
-                            "action": act_name,
-                            "agent": agent_name,
-                            
-                            # 2. Force missing timestamps to be "--" instead of inheriting
-                            "timestamp": act.get("when", "--"), 
-                            
-                            "description": act.get("digitalSourceType", "Asset event recorded.").split("/")[-1]
-                        })
+            if "c2pa.actions" in assertion.get("label", ""):
+                for act in assertion.get("data", {}).get("actions", []):
+                    agent = act.get("softwareAgent", {})
+                    
+                    agent_name = agent.get("name") if isinstance(agent, dict) else str(agent) if agent else "Unknown"
+                    act_name = act.get("action", "Unknown").split(".")[-1].title()
+                    
+                    history.append({
+                        "action": act_name,
+                        "agent": agent_name,
+                        "timestamp": act.get("when", "--"), 
+                        "description": act.get("digitalSourceType", "Asset event recorded.").split("/")[-1]
+                    })
                     
         history.append({
             "action": "Signed",
@@ -129,6 +122,22 @@ async def execute_correlation_engine(job_id: str, evidence_id: str, session):
     
     file_path = evidence_record.storage_uri
     
+    # 1. STRICT FORMAT GATEKEEPER
+    mime_type, _ = mimetypes.guess_type(file_path)
+    if mime_type and not mime_type.startswith(('image/', 'video/')):
+        logger.warning(f"[JOB {job_id}] Rejected unsupported media type: {mime_type}")
+        report_data = {
+            "deepfake_probability": None,
+            "c2pa_data": None,
+            "platform_status": "REJECTED",
+            "disposition": f"Unsupported format ({mime_type}). Visual forensics require image or video assets.",
+            "threat_summary": "Analysis aborted by format gatekeeper." 
+        }
+        update_stmt = text("UPDATE analysis.analysis_jobs SET ai_report = :report, status = 'COMPLETED' WHERE id = :job_id")
+        await session.execute(update_stmt, {"report": json.dumps(report_data), "job_id": job_id})
+        return
+
+    # 2. PROCEED WITH NORMAL ML PROCESSING
     metadata = evidence_record.metadata_dict or {}
     use_vit = metadata.get("use_vit", True)
     use_c2pa = metadata.get("use_c2pa", True)
