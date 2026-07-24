@@ -18,12 +18,12 @@ C2PA_API_KEY = os.getenv("C2PA_API_KEY", "IUHEWRUHIJKLSBXBMNM-XHXBNV9885IKDUF")
 
 def is_valid_visual_media(file_path: str) -> bool:
     """Multi-layered gatekeeper combining extension, mime, and magic bytes."""
-    # 1. Hard block known audio extensions
+    # 1.block audio extensions
     _, ext = os.path.splitext(file_path.lower())
     if ext in {'.m4a', '.mp3', '.wav', '.flac', '.aac', '.ogg', '.wma'}:
         return False
         
-    # 2. Hard block audio mimetypes
+    # 2.block audio mimetypes
     mime_type, _ = mimetypes.guess_type(file_path)
     if mime_type and mime_type.startswith('audio/'):
         return False
@@ -56,7 +56,7 @@ def call_vit_core_microservice(file_path: str) -> float:
             files = {"file": (os.path.basename(file_path), f)}
             response = requests.post(VIT_CORE_URL, files=files, headers=headers, params={"explain": "false"}, timeout=120)
         
-        # NEW: Explicitly catch 400 Bad Request format rejections from the microservice
+        # Explicitly catch 400 Bad Request format rejections from the microservice
         if response.status_code == 400:
             raise ValueError(f"Format Rejected: {response.text}")
             
