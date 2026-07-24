@@ -4,7 +4,7 @@ import json
 import urllib.request
 import requests
 import os
-import mimetypes # NEW: Built-in library to check file types
+import mimetypes
 from sqlalchemy import select, text
 from infrastructure.persistence.database import async_session_maker
 from infrastructure.persistence.models import AnalysisJobORM, EvidenceORM
