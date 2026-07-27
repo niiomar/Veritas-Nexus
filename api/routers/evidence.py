@@ -40,6 +40,7 @@ async def ingest_evidence(
     use_c2pa: bool = Form(True),   
     db: AsyncSession = Depends(get_db)
 ):
+    
     try:
         STORAGE_VAULT.mkdir(parents=True, exist_ok=True)
         evidence_id = uuid.uuid4()
@@ -126,6 +127,7 @@ async def list_evidence(db: AsyncSession = Depends(get_db)):
         records = result.mappings().all()
 
         evidence_list = []
+        
         for row in records:
             report = row.get("ai_report")
             if isinstance(report, str):
