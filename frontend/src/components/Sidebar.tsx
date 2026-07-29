@@ -77,7 +77,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {caseEv.length} ASSETS
                 </div>
                 
-                {/* BULLETPROOF UI GRID */}
+                {/* UI GRID */}
                 <div style={{ 
                   display: 'grid', 
                   gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', 
