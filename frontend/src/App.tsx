@@ -276,7 +276,7 @@ export default function App() {
                    className="mono hover-bright" 
                    style={{ marginTop: '32px', background: 'var(--text-main)', border: 'none', color: '#000', borderRadius: '4px', padding: '12px 24px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', letterSpacing: '0.1em' }}
                  >
-                   INITIALIZE NEW CASE
+                   INITIALIZATION NEW CASE
                  </button>
               </div>
             ) : (
