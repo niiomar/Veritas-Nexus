@@ -467,7 +467,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
                     )}
                   </div>
                   
-                  {/* FULLY REFACTORED: XAI STATIC THREAT GAUGE */}
+                  {/* XAI STATIC THREAT GAUGE */}
                   <div className="mono" style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr', padding: '24px 32px', fontSize: '11px', color: 'var(--text-faint)', letterSpacing: '0.05em', background: 'rgba(255,255,255,0.02)', gap: '32px' }}>
                     
                     <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
@@ -477,7 +477,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
                       <div style={{ position: 'relative', height: '6px', width: '100%', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '3px' }}>
                         {!isVitUnavailable && (
                           <>
-                            {/* Static Zoned Background - No overlapping active fill */}
+                            {/* Static Zoned Background */}
                             <div style={{ position: 'absolute', left: '0%', width: '15%', height: '100%', backgroundColor: '#10b981', opacity: 0.4, borderRadius: '3px 0 0 3px' }}></div>
                             <div style={{ position: 'absolute', left: '15%', width: '55%', height: '100%', backgroundColor: '#f59e0b', opacity: 0.4 }}></div>
                             <div style={{ position: 'absolute', left: '70%', width: '30%', height: '100%', backgroundColor: '#ef4444', opacity: 0.4, borderRadius: '0 3px 3px 0' }}></div>
@@ -493,7 +493,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
                             <div style={{ position: 'absolute', left: '100%', top: '12px', transform: 'translateX(-100%)', fontSize: '9px', color: 'var(--text-muted)' }}>100%</div>
                           </>
                         )}
-                        {/* The Actual Slider Marker (Needle) */}
+                        {/* The Actual Slider Marker */}
                         {typeof vitProb === 'number' && (
                           <div style={{ position: 'absolute', left: `${vitProb * 100}%`, top: '-6px', bottom: '-6px', width: '3px', backgroundColor: '#fff', boxShadow: '0 0 8px rgba(255,255,255,1)', zIndex: 2, transform: 'translateX(-50%)', borderRadius: '1px' }}></div>
                         )}
