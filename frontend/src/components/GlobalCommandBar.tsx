@@ -7,6 +7,5 @@ export const GlobalCommandBar: React.FC = () => (
       <Shield size={18} color="var(--c-system)" /> 
       <span style={{ letterSpacing: '0.05em' }}>VERITAS NEXUS</span>
     </div>
-    {/* Classification header removed */}
   </header>
 );
