@@ -38,7 +38,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
               if (platformStatus === 'REJECTED') {
                 acc.rejected++;
-              } else if (verdict === 'CRITICAL' || platformStatus === 'CRITICAL THREAT' || c2paStatus === 'BROKEN_SIGNATURE') {
+              } else if (verdict === 'CRITICAL' || platformStatus === 'CRITICAL THREAT' || c2paStatus === 'INVALID') {
                 acc.critical++;
               } else if (verdict === 'CONFLICT' || platformStatus === 'CONFLICT') {
                 acc.conflict++;

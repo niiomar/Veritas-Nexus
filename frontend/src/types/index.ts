@@ -10,7 +10,7 @@ export interface Case {
   count: number;
 }
 
-export type ProvenanceStatus = "VALID" | "BROKEN_SIGNATURE" | "UNSIGNED" | "PARTIAL";
+export type ProvenanceStatus = "VALID" | "INVALID" | "UNSIGNED" | "PARTIAL";
 
 export interface C2PAAction {
   action: string;

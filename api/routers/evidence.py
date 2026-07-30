@@ -9,35 +9,41 @@ import logging
 import asyncio
 import traceback
 from pathlib import Path
+from dotenv import load_dotenv
 from sqlalchemy import text
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from fastapi.responses import FileResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.dependencies import get_db_session as get_db
+from api.dependencies import get_db_session as get_db, require_api_key
 from infrastructure.persistence.models import EvidenceORM, AnalysisJobORM, AuditEventORM
 
 # Import the new EXIF Engine
 from api.services.exif_core import ExifCoreEngine
 
+load_dotenv()
+
 # Setup logging
 logger = logging.getLogger("EvidenceRouter")
 
 router = APIRouter(prefix="/api/v1/evidence", tags=["Evidence"])
-STORAGE_VAULT = Path("/vault") 
+STORAGE_VAULT = Path("/vault")
 
 # Read microservice credentials
 VIT_CORE_URL = os.getenv("VIT_CORE_URL", "http://host.docker.internal:8001/api/v1/analyze")
-VIT_CORE_API_KEY = os.getenv("VIT_CORE_API_KEY", "vitcore_forensics_secure_token_2026")
+VIT_CORE_API_KEY = os.getenv("VIT_CORE_API_KEY")
+if not VIT_CORE_API_KEY:
+    logger.warning("VIT_CORE_API_KEY is not set - requests to the ViT-CORE engine will fail authentication.")
 
-@router.post("/")
+
+@router.post("/", dependencies=[Depends(require_api_key)])
 async def ingest_evidence(
     case_id: uuid.UUID = Form(...),
     uploaded_by: str = Form(...),
     file: UploadFile = File(...),
-    use_vit: bool = Form(True),    
-    use_c2pa: bool = Form(True),   
+    use_vit: bool = Form(True),
+    use_c2pa: bool = Form(True),
     db: AsyncSession = Depends(get_db)
 ):
     
@@ -59,7 +65,11 @@ async def ingest_evidence(
         file_hash = sha256_hash.hexdigest()
 
         # RUN METADATA EXTRACTION IMMEDIATELY ON INGEST
-        exif_data = ExifCoreEngine.extract_metadata(str(file_path))
+        # Offloaded to a worker thread: this shells out to exiftool and runs
+        # OpenCV ELA analysis, both of which are blocking calls that would
+        # otherwise stall the whole asyncio event loop (and every other
+        # concurrent request) for the duration of the upload.
+        exif_data = await asyncio.to_thread(ExifCoreEngine.extract_metadata, str(file_path))
 
         now = datetime.now(timezone.utc)
         
@@ -116,7 +126,7 @@ async def ingest_evidence(
 @router.get("/")
 async def list_evidence(db: AsyncSession = Depends(get_db)):
     try:
-        # e.metadata_dict to the SQL SELECT query
+        # ADDED: e.metadata_dict to the SQL SELECT query
         stmt = text("""
             SELECT e.id, e.case_id, e.original_filename, e.sha256, e.uploaded_at, e.metadata_dict, j.status, j.ai_report
             FROM core.evidence e
@@ -166,6 +176,7 @@ async def get_evidence_file(evidence_id: uuid.UUID, db: AsyncSession = Depends(g
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to retrieve file: {str(e)}")
 
+
 def fetch_visual_from_microservice(file_path: str, visual_type: str) -> bytes:
     """Extracts specific visual layers (heatmap, patches, attention) from the ViT-CORE."""
     headers = { "X-API-KEY": VIT_CORE_API_KEY, "accept": "application/json" }
@@ -207,8 +218,12 @@ def fetch_visual_from_microservice(file_path: str, visual_type: str) -> bytes:
         raise RuntimeError(f"Network error communicating with ViT-CORE: {str(e)}")
     except Exception as e:
         raise RuntimeError(f"Proxy decoding failed: {repr(e)}")
-        
+
+
+# ---------------------------------------------------------
 # DYNAMIC PROXY ROUTER HANDLERS
+# ---------------------------------------------------------
+
 async def _proxy_visual(evidence_id: uuid.UUID, visual_type: str, db: AsyncSession):
     """Core logic to fetch physical file paths and route them to the ViT microservice."""
     try:
@@ -229,19 +244,23 @@ async def _proxy_visual(evidence_id: uuid.UUID, visual_type: str, db: AsyncSessi
         logger.error(f"Endpoint Error: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail="Internal server error during proxy.")
 
+
 @router.get("/{evidence_id}/heatmap", tags=["Evidence", "ViT-CORE"])
 async def get_heatmap(evidence_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     return await _proxy_visual(evidence_id, "heatmap", db)
+
 
 @router.get("/{evidence_id}/patches", tags=["Evidence", "ViT-CORE"])
 async def get_patches(evidence_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     return await _proxy_visual(evidence_id, "patches", db)
 
+
 @router.get("/{evidence_id}/attention", tags=["Evidence", "ViT-CORE"])
 async def get_attention(evidence_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     return await _proxy_visual(evidence_id, "attention", db)
 
-@router.delete("/{evidence_id}", tags=["Evidence"])
+
+@router.delete("/{evidence_id}", tags=["Evidence"], dependencies=[Depends(require_api_key)])
 async def delete_evidence(evidence_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     """Deletes evidence record, child dependencies, and the physical file."""
     try:

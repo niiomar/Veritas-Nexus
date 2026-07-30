@@ -1,70 +1,33 @@
-from fastapi import Depends, Request
+import os
+import secrets
+import logging
+
+from dotenv import load_dotenv
+from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from infrastructure.persistence.database import async_session_maker
-from infrastructure.persistence.unit_of_work import SQLUnitOfWork
-from infrastructure.storage.local_storage import LocalStorageService
-from infrastructure.events.local_dispatcher import LocalEventDispatcher
-from infrastructure.identity.jwt_provider import JWTIdentityProvider
 
-from application.ports.unit_of_work import IUnitOfWork
-from application.ports.services import IStorageService, IIdentityProvider
-from application.ports.events import IEventDispatcher
+load_dotenv()
 
-from application.use_cases.upload_evidence import UploadEvidenceUseCase
-from application.use_cases.case_management import CreateCaseUseCase
+logger = logging.getLogger("Dependencies")
 
-# Infrastructure Providers
+# --- Database session ---
+
 async def get_db_session() -> AsyncSession:
     async with async_session_maker() as session:
         yield session
 
-def get_uow(session: AsyncSession = Depends(get_db_session)) -> IUnitOfWork:
-    # We pass the session factory to the UoW
-    return SQLUnitOfWork(async_session_maker)
+# --- Shared-secret API key gate ---
+# Stopgap authorization for state-changing routes: not per-user auth, just a
+# shared secret that keeps opportunistic/automated traffic off the raw API.
+# See PLATFORM_API_KEY in .env.example.
 
-def get_storage_service() -> IStorageService:
-    return LocalStorageService(base_dir="/app/storage_vault")
+PLATFORM_API_KEY = os.getenv("PLATFORM_API_KEY")
 
-def get_event_dispatcher() -> IEventDispatcher:
-    # In Phase 1, this is a singleton in-memory dispatcher.
-    # In a real deployment, this would inject a Redis/Kafka client.
-    return LocalEventDispatcher()
+if not PLATFORM_API_KEY:
+    logger.warning("PLATFORM_API_KEY is not set - all API-key-gated routes will reject every request.")
 
-def get_identity_provider(request: Request) -> IIdentityProvider:
-    # Extracts the JWT from the incoming FastAPI request context
-    return JWTIdentityProvider()
-
-# Mock Implementations for Phase 1
-# (To be replaced with concrete implementations as built out)
-class SimpleHashService:
-    async def generate_sha256(self, file_stream) -> str:
-        import hashlib
-        file_bytes = file_stream.read()
-        file_stream.seek(0)
-        return hashlib.sha256(file_bytes).hexdigest()
-
-class SimpleClock:
-    def utcnow(self):
-        from datetime import datetime, timezone
-        return datetime.now(timezone.utc)
-
-def get_hash_service(): return SimpleHashService()
-def get_clock(): return SimpleClock()
-
-# Use Case Factories
-def get_upload_evidence_use_case(
-    uow: IUnitOfWork = Depends(get_uow),
-    storage: IStorageService = Depends(get_storage_service),
-    hasher = Depends(get_hash_service),
-    clock = Depends(get_clock),
-    dispatcher: IEventDispatcher = Depends(get_event_dispatcher)
-) -> UploadEvidenceUseCase:
-    return UploadEvidenceUseCase(uow, storage, hasher, clock, dispatcher)
-
-def get_create_case_use_case(
-    uow: IUnitOfWork = Depends(get_uow),
-    identity: IIdentityProvider = Depends(get_identity_provider),
-    clock = Depends(get_clock)
-) -> CreateCaseUseCase:
-    return CreateCaseUseCase(uow, identity, clock)
+async def require_api_key(x_api_key: str | None = Header(default=None, alias="X-API-Key")) -> None:
+    if not PLATFORM_API_KEY or not x_api_key or not secrets.compare_digest(x_api_key, PLATFORM_API_KEY):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing or invalid API key.")

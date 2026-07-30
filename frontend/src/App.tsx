@@ -38,18 +38,16 @@ export default function App() {
 
   const syncDatabase = useCallback(async () => {
     try {
-      const evidenceData = await EvidenceAPI.fetchLibrary();
+      const [evidenceData, caseData] = await Promise.all([
+        EvidenceAPI.fetchLibrary(),
+        EvidenceAPI.fetchCases(),
+      ]);
       setEvidenceLibrary(evidenceData);
       setSelectedEvidence((prev) => prev ? evidenceData.find((e: Evidence) => e.id === prev.id) || prev : null);
+      setCases(caseData);
+      setActiveCase((prev) => prev ? caseData.find((c: Case) => c.id === prev.id) || null : null);
     } catch (err) {
-      console.error("Evidence sync failed:", err);
-    }
-
-    const cached = localStorage.getItem('veritas_cases');
-    if (cached) {
-      const parsedCases = JSON.parse(cached);
-      setCases(parsedCases);
-      setActiveCase((prev) => prev ? parsedCases.find((c: Case) => c.id === prev.id) || prev : null);
+      console.error("Database sync failed:", err);
     }
 
     const now = new Date();
@@ -96,12 +94,8 @@ export default function App() {
         id: dbResponse.id || dbResponse.case_id,
         name: dbResponse.title || newCase.name,
       };
-      
-      setCases(prev => {
-        const updated = [officialCase, ...prev];
-        localStorage.setItem('veritas_cases', JSON.stringify(updated));
-        return updated;
-      });
+
+      await syncDatabase();
       setActiveCase(officialCase);
       setIsCreateModalOpen(false);
     } catch (err: any) {
@@ -117,12 +111,8 @@ export default function App() {
         ...updatedCase,
         name: dbResponse.title || updatedCase.name,
       };
-      
-      setCases(prev => {
-        const updated = prev.map(c => c.id === officialCase.id ? officialCase : c);
-        localStorage.setItem('veritas_cases', JSON.stringify(updated));
-        return updated;
-      });
+
+      await syncDatabase();
       if (activeCase?.id === officialCase.id) setActiveCase(officialCase);
       setCaseToEdit(null);
     } catch (err: any) {
@@ -134,16 +124,13 @@ export default function App() {
   const confirmDeleteCase = async () => {
     if (!caseToDelete) return;
     try {
-      setCases(prev => {
-        const updated = prev.filter(c => c.id !== caseToDelete.id);
-        localStorage.setItem('veritas_cases', JSON.stringify(updated));
-        return updated;
-      });
+      await EvidenceAPI.deleteCase(caseToDelete.id);
       if (activeCase?.id === caseToDelete.id) {
         setActiveCase(null);
         setSelectedEvidence(null);
       }
-      setCaseToDelete(null); 
+      await syncDatabase();
+      setCaseToDelete(null);
     } catch (err: any) {
       setUploadError(`Case Deletion Failed: ${err.message}`);
       setTimeout(() => setUploadError(null), 5000);
@@ -154,21 +141,13 @@ export default function App() {
     if (!evidenceToDelete) return;
     
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/v1/evidence/${evidenceToDelete.id}`, {
-        method: 'DELETE'
-      });
-      
-      if (response.ok) {
-        if (selectedEvidence?.id === evidenceToDelete.id) {
-          setSelectedEvidence(null);
-        }
-        syncDatabase(); 
-      } else {
-        setUploadError(`Failed to delete evidence.`);
-        setTimeout(() => setUploadError(null), 5000);
+      await EvidenceAPI.deleteEvidence(evidenceToDelete.id);
+      if (selectedEvidence?.id === evidenceToDelete.id) {
+        setSelectedEvidence(null);
       }
+      syncDatabase();
     } catch (err: any) {
-      setUploadError(`Network error: ${err.message}`);
+      setUploadError(err.message || 'Failed to delete evidence.');
       setTimeout(() => setUploadError(null), 5000);
     } finally {
       setEvidenceToDelete(null);
@@ -369,11 +348,11 @@ export default function App() {
                           const platformStatus = item.ai_report?.platform_status;
                           const c2paStatus = item.ai_report?.c2pa_data?.status;
 
-                          // SYNCHRONIZED LEDGER STATUS COLORS
+                          // --- SYNCHRONIZED LEDGER STATUS COLORS ---
                           let statusHex = '#38bdf8'; // Sky Blue for Unverified
                           if (platformStatus === 'REJECTED') {
                             statusHex = '#a855f7'; // Vivid Purple for Rejected
-                          } else if (ast.verdict === 'CRITICAL' || platformStatus === 'CRITICAL THREAT' || c2paStatus === 'BROKEN_SIGNATURE') {
+                          } else if (ast.verdict === 'CRITICAL' || platformStatus === 'CRITICAL THREAT' || c2paStatus === 'INVALID') {
                             statusHex = '#ef4444'; // Red
                           } else if (ast.verdict === 'CONFLICT' || platformStatus === 'CONFLICT') {
                             statusHex = '#f59e0b'; // Amber/Orange

@@ -1,5 +1,16 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
+// Shared secret sent as X-API-Key on state-changing requests. This is a
+// stopgap, not real per-user auth: Vite inlines VITE_-prefixed vars into the
+// built client bundle, so it's visible to anyone who opens devtools. It only
+// keeps opportunistic/automated traffic off the raw API.
+const API_KEY = import.meta.env.VITE_PLATFORM_API_KEY || '';
+
+const authHeaders = (extra?: Record<string, string>) => ({
+  ...(API_KEY ? { 'X-API-Key': API_KEY } : {}),
+  ...extra,
+});
+
 const parseFastAPIError = (errorData: any, defaultMessage: string) => {
   if (!errorData) return defaultMessage;
   if (typeof errorData.detail === 'string') return errorData.detail;
@@ -10,6 +21,13 @@ const parseFastAPIError = (errorData: any, defaultMessage: string) => {
 };
 
 export const EvidenceAPI = {
+  fetchCases: async () => {
+    const response = await fetch(`${API_BASE_URL}/api/v1/cases`);
+    if (!response.ok) throw new Error('Failed to fetch case list');
+    const data = await response.json();
+    return Array.isArray(data) ? data : (data.cases || []);
+  },
+
   fetchLibrary: async () => {
     const response = await fetch(`${API_BASE_URL}/api/v1/evidence/`);
     if (!response.ok) throw new Error('Failed to fetch evidence library');
@@ -31,9 +49,9 @@ export const EvidenceAPI = {
   createCase: async (caseData: any) => {
     const response = await fetch(`${API_BASE_URL}/api/v1/cases`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
-        title: caseData.name, 
+        title: caseData.name,
         alias: caseData.alias,
         priority: caseData.priority,
         analyst: caseData.analyst,
@@ -47,7 +65,7 @@ export const EvidenceAPI = {
   updateCase: async (caseId: string, caseData: any) => {
     const response = await fetch(`${API_BASE_URL}/api/v1/cases/${caseId}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         title: caseData.name,
         alias: caseData.alias,
@@ -61,7 +79,10 @@ export const EvidenceAPI = {
   },
 
   deleteCase: async (caseId: string) => {
-    const response = await fetch(`${API_BASE_URL}/api/v1/cases/${caseId}`, { method: 'DELETE' });
+    const response = await fetch(`${API_BASE_URL}/api/v1/cases/${caseId}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    });
     if (!response.ok) throw new Error(parseFastAPIError(await response.json().catch(()=>null), 'Failed to delete case from PostgreSQL'));
     return true;
   },
@@ -72,16 +93,26 @@ export const EvidenceAPI = {
     formData.append("file", file);
     formData.append("case_id", caseId);
     formData.append("uploaded_by", uploadedBy);
-    
+
     // FASTAPI requires these as strings in the form data
     formData.append("use_vit", String(useVit));
     formData.append("use_c2pa", String(useC2pa));
 
     const response = await fetch(`${API_BASE_URL}/api/v1/evidence/`, {
       method: 'POST',
-      body: formData, 
+      headers: authHeaders(),
+      body: formData,
     });
     if (!response.ok) throw new Error(parseFastAPIError(await response.json().catch(()=>null), `Upload failed with status ${response.status}`));
     return response.json();
+  },
+
+  deleteEvidence: async (evidenceId: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/v1/evidence/${evidenceId}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    });
+    if (!response.ok) throw new Error(parseFastAPIError(await response.json().catch(()=>null), 'Failed to delete evidence'));
+    return true;
   }
 };

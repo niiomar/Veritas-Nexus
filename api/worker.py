@@ -4,26 +4,35 @@ import json
 import requests
 import os
 import mimetypes
+from dotenv import load_dotenv
 from sqlalchemy import select, text
 from infrastructure.persistence.database import async_session_maker
 from infrastructure.persistence.models import AnalysisJobORM, EvidenceORM
+from api.services.assessment_engine import evaluate_assessment
+
+load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("NSB-Platform-Worker")
 
 VIT_CORE_URL = os.getenv("VIT_CORE_URL", "http://host.docker.internal:8001/api/v1/analyze")
-VIT_CORE_API_KEY = os.getenv("VIT_CORE_API_KEY", "vitcore_forensics_secure_token_2026")
-C2PA_URL = os.getenv("C2PA_URL", "http://host.docker.internal:8002/api/v1/verify") 
-C2PA_API_KEY = os.getenv("C2PA_API_KEY", "IUHEWRUHIJKLSBXBMNM-XHXBNV9885IKDUF")
+VIT_CORE_API_KEY = os.getenv("VIT_CORE_API_KEY")
+C2PA_URL = os.getenv("C2PA_URL", "http://host.docker.internal:8002/api/v1/verify")
+C2PA_API_KEY = os.getenv("C2PA_API_KEY")
+
+if not VIT_CORE_API_KEY:
+    logger.warning("VIT_CORE_API_KEY is not set - requests to the ViT-CORE engine will fail authentication.")
+if not C2PA_API_KEY:
+    logger.warning("C2PA_API_KEY is not set - requests to the C2PA-Veritas engine will fail authentication.")
 
 def is_valid_visual_media(file_path: str) -> bool:
     """Multi-layered gatekeeper combining extension, mime, and magic bytes."""
-    # 1.block audio extensions
+    # 1. Hard block known audio extensions
     _, ext = os.path.splitext(file_path.lower())
     if ext in {'.m4a', '.mp3', '.wav', '.flac', '.aac', '.ogg', '.wma'}:
         return False
         
-    # 2.block audio mimetypes
+    # 2. Hard block audio mimetypes
     mime_type, _ = mimetypes.guess_type(file_path)
     if mime_type and mime_type.startswith('audio/'):
         return False
@@ -150,21 +159,23 @@ async def execute_correlation_engine(job_id: str, evidence_id: str, session):
     if not evidence_record: raise ValueError("Evidence record not found.")
     
     file_path = evidence_record.storage_uri
-    
+    metadata = evidence_record.metadata_dict or {}
+    exif = metadata.get("exif")
+
     # 1. STRICT MULTI-LAYER GATEKEEPER
     if not is_valid_visual_media(file_path):
         logger.error(f"[JOB {job_id}] 🚨 MEDIA REJECTED: Multi-layer inspection indicates unsupported format.")
         report_data = {
             "deepfake_probability": None, "c2pa_data": None, "platform_status": "REJECTED",
             "disposition": "Unsupported format. Visual forensics require valid image or video assets.",
-            "threat_summary": "Analysis aborted by strict binary gatekeeper." 
+            "threat_summary": "Analysis aborted by strict binary gatekeeper."
         }
+        report_data["assessment"] = evaluate_assessment(report_data, exif)
         update_stmt = text("UPDATE analysis.analysis_jobs SET ai_report = :report, status = 'COMPLETED' WHERE id = :job_id")
         await session.execute(update_stmt, {"report": json.dumps(report_data), "job_id": job_id})
         return
 
     # 2. PROCEED WITH NORMAL ML PROCESSING
-    metadata = evidence_record.metadata_dict or {}
     use_vit = metadata.get("use_vit", True)
     use_c2pa = metadata.get("use_c2pa", True)
 
@@ -177,8 +188,9 @@ async def execute_correlation_engine(job_id: str, evidence_id: str, session):
             report_data = {
                 "deepfake_probability": None, "c2pa_data": None, "platform_status": "REJECTED",
                 "disposition": "Media rejected by neural engine. Supported visual container but no viable subjects/frames detected.",
-                "threat_summary": "Analysis aborted by Neural Engine." 
+                "threat_summary": "Analysis aborted by Neural Engine."
             }
+            report_data["assessment"] = evaluate_assessment(report_data, exif)
             update_stmt = text("UPDATE analysis.analysis_jobs SET ai_report = :report, status = 'COMPLETED' WHERE id = :job_id")
             await session.execute(update_stmt, {"report": json.dumps(report_data), "job_id": job_id})
             return
@@ -239,9 +251,10 @@ async def execute_correlation_engine(job_id: str, evidence_id: str, session):
         "c2pa_data": c2pa_data,
         "platform_status": status_flag,
         "disposition": disposition,
-        "threat_summary": "Intelligence assessment complete." 
+        "threat_summary": "Intelligence assessment complete."
     }
-    
+    report_data["assessment"] = evaluate_assessment(report_data, exif)
+
     update_stmt = text("UPDATE analysis.analysis_jobs SET ai_report = :report, status = 'COMPLETED' WHERE id = :job_id")
     await session.execute(update_stmt, {"report": json.dumps(report_data), "job_id": job_id})
     logger.info(f"[JOB {job_id}] Correlation Assessment complete.")

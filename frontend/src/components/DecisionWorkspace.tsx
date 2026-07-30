@@ -26,9 +26,15 @@ const dossierStyles = `
   .json-boolean { color: #f472b6; }
 `;
 
+const escapeHtml = (str: string) =>
+  str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
 const syntaxHighlight = (json: any) => {
   if (!json) return '';
-  const str = JSON.stringify(json, null, 2);
+  // Escape HTML metacharacters BEFORE tokenizing so attacker-controlled strings
+  // inside the payload (e.g. a C2PA manifest issuer/description field) can never
+  // inject markup through the dangerouslySetInnerHTML call below.
+  const str = escapeHtml(JSON.stringify(json, null, 2));
   return str.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, (match) => {
     let cls = 'json-number';
     if (/^"/.test(match)) {
@@ -74,7 +80,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
 
   const isVitUnavailable = vitProb === null || vitProb === undefined;
   const isC2paBypassed = c2pa?.raw_status === "Bypassed by User";
-  const isC2paBroken = c2pa?.status === "BROKEN_SIGNATURE";
+  const isC2paBroken = c2pa?.status === "INVALID";
   
   // SYNCHRONIZED DOSSIER THEME LOGIC
   const finalVerdict = platformStatus === 'REJECTED' ? 'REJECTED' :

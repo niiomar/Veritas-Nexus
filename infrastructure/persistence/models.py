@@ -23,6 +23,8 @@ class CaseORM(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     tags: Mapped[list[str]] = mapped_column(ARRAY(String))
+    alias: Mapped[str | None] = mapped_column(String, nullable=True)
+    analyst: Mapped[str | None] = mapped_column(String, nullable=True)
 
 class EvidenceORM(Base):
     __tablename__ = "evidence"
@@ -44,6 +46,7 @@ class AnalysisJobORM(Base):
     evidence_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("core.evidence.id"))
     status: Mapped[str] = mapped_column(String)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    ai_report: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
 class AuditEventORM(Base):
     __tablename__ = "audit_events"

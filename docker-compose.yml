@@ -32,6 +32,10 @@ services:
     environment:
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres_password@db:5432/veritas_nexus
       - ENVIRONMENT=development
+      # Sourced from the project's untracked .env file (see .env.example).
+      - VIT_CORE_API_KEY=${VIT_CORE_API_KEY}
+      - C2PA_API_KEY=${C2PA_API_KEY}
+      - PLATFORM_API_KEY=${PLATFORM_API_KEY}
     # --- THIS IS THE FIX ---
     extra_hosts:
       - "host.docker.internal:host-gateway"
