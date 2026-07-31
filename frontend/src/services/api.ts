@@ -1,15 +1,17 @@
+import { TokenStorage } from './auth';
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
-// Shared secret sent as X-API-Key on state-changing requests. This is a
-// stopgap, not real per-user auth: Vite inlines VITE_-prefixed vars into the
-// built client bundle, so it's visible to anyone who opens devtools. It only
-// keeps opportunistic/automated traffic off the raw API.
-const API_KEY = import.meta.env.VITE_PLATFORM_API_KEY || '';
-
-const authHeaders = (extra?: Record<string, string>) => ({
-  ...(API_KEY ? { 'X-API-Key': API_KEY } : {}),
-  ...extra,
-});
+// Real per-user auth (see services/auth.ts) superseded the old shared
+// X-API-Key stopgap - every state-changing request now carries the logged-in
+// user's JWT instead.
+const authHeaders = (extra?: Record<string, string>) => {
+  const token = TokenStorage.get();
+  return {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...extra,
+  };
+};
 
 const parseFastAPIError = (errorData: any, defaultMessage: string) => {
   if (!errorData) return defaultMessage;
@@ -87,7 +89,6 @@ export const EvidenceAPI = {
     return true;
   },
 
-  // useVit and useC2pa parameters
   uploadPayload: async (file: File, caseId: string, uploadedBy: string = "Analyst_01", useVit: boolean = true, useC2pa: boolean = true) => {
     const formData = new FormData();
     formData.append("file", file);

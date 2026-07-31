@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import String, DateTime, ForeignKey, MetaData
+from sqlalchemy import Boolean, String, DateTime, ForeignKey, MetaData
 from sqlalchemy.dialects.postgresql import JSONB, UUID, ARRAY
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -9,6 +9,17 @@ metadata = MetaData(schema="core")
 
 class Base(DeclarativeBase):
     metadata = metadata
+
+class UserORM(Base):
+    __tablename__ = "users"
+    __table_args__ = {"schema": "core"}
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    email: Mapped[str] = mapped_column(String, unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String)
+    is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    role: Mapped[str] = mapped_column(String, default="ANALYST")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 class CaseORM(Base):
     __tablename__ = "cases"
@@ -25,6 +36,7 @@ class CaseORM(Base):
     tags: Mapped[list[str]] = mapped_column(ARRAY(String))
     alias: Mapped[str | None] = mapped_column(String, nullable=True)
     analyst: Mapped[str | None] = mapped_column(String, nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 class EvidenceORM(Base):
     __tablename__ = "evidence"
@@ -38,6 +50,7 @@ class EvidenceORM(Base):
     uploaded_by: Mapped[str] = mapped_column(String)
     uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     metadata_dict: Mapped[dict] = mapped_column(JSONB)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 class AnalysisJobORM(Base):
     __tablename__ = "analysis_jobs"

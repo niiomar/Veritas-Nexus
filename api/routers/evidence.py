@@ -16,8 +16,8 @@ from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from fastapi.responses import FileResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.dependencies import get_db_session as get_db, require_api_key
-from infrastructure.persistence.models import EvidenceORM, AnalysisJobORM, AuditEventORM
+from api.dependencies import get_db_session as get_db, get_current_user
+from infrastructure.persistence.models import EvidenceORM, AnalysisJobORM, AuditEventORM, UserORM
 
 # Import the new EXIF Engine
 from api.services.exif_core import ExifCoreEngine
@@ -37,14 +37,15 @@ if not VIT_CORE_API_KEY:
     logger.warning("VIT_CORE_API_KEY is not set - requests to the ViT-CORE engine will fail authentication.")
 
 
-@router.post("/", dependencies=[Depends(require_api_key)])
+@router.post("/")
 async def ingest_evidence(
     case_id: uuid.UUID = Form(...),
     uploaded_by: str = Form(...),
     file: UploadFile = File(...),
     use_vit: bool = Form(True),
     use_c2pa: bool = Form(True),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: UserORM = Depends(get_current_user),
 ):
     
     try:
@@ -105,7 +106,7 @@ async def ingest_evidence(
             resource_id=evidence_id,
             action="EVIDENCE_INGESTED",
             created_at=now,
-            performed_by=uploaded_by
+            performed_by=current_user.email
         )
         db.add(audit_event)
 
@@ -124,20 +125,46 @@ async def ingest_evidence(
 
 
 @router.get("/")
-async def list_evidence(db: AsyncSession = Depends(get_db)):
+async def list_evidence(
+    db: AsyncSession = Depends(get_db),
+    case_id: uuid.UUID | None = None,
+    limit: int = 500,
+    offset: int = 0,
+):
+    """Lists evidence, newest first. Unbounded before this - fine at demo
+    scale, but nothing stopped a single query from pulling back the entire
+    ledger as it grows. `limit`/`offset` bound that; `case_id` lets a caller
+    scope to one case's evidence without pulling the whole library (the
+    frontend still fetches everything today, since Sidebar's per-case stat
+    counts need visibility across all cases at once - narrowing that is a
+    frontend data-flow change of its own, not a query-shape one)."""
+    limit = max(1, min(limit, 2000))
+    offset = max(0, offset)
     try:
-        # ADDED: e.metadata_dict to the SQL SELECT query
-        stmt = text("""
+        where_clauses = ["e.deleted_at IS NULL"]
+        params: dict = {"limit": limit, "offset": offset}
+        if case_id is not None:
+            where_clauses.append("e.case_id = :case_id")
+            params["case_id"] = str(case_id)
+        where_sql = " AND ".join(where_clauses)
+
+        total = (await db.execute(
+            text(f"SELECT COUNT(*) FROM core.evidence e WHERE {where_sql}"), params
+        )).scalar_one()
+
+        stmt = text(f"""
             SELECT e.id, e.case_id, e.original_filename, e.sha256, e.uploaded_at, e.metadata_dict, j.status, j.ai_report
             FROM core.evidence e
             JOIN analysis.analysis_jobs j ON e.id = j.evidence_id
+            WHERE {where_sql}
             ORDER BY e.uploaded_at DESC
+            LIMIT :limit OFFSET :offset
         """)
-        result = await db.execute(stmt)
+        result = await db.execute(stmt, params)
         records = result.mappings().all()
 
         evidence_list = []
-        
+
         for row in records:
             report = row.get("ai_report")
             if isinstance(report, str):
@@ -154,8 +181,8 @@ async def list_evidence(db: AsyncSession = Depends(get_db)):
                 "metadata_dict": row.get("metadata_dict", {}) # Append EXIF to payload
             })
 
-        return {"evidence": evidence_list}
-        
+        return {"evidence": evidence_list, "total": total, "limit": limit, "offset": offset}
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch library: {str(e)}")
 
@@ -163,7 +190,7 @@ async def list_evidence(db: AsyncSession = Depends(get_db)):
 async def get_evidence_file(evidence_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     """Serves the raw physical file for the SOURCE tab."""
     try:
-        stmt = text("SELECT storage_uri FROM core.evidence WHERE id = :id")
+        stmt = text("SELECT storage_uri FROM core.evidence WHERE id = :id AND deleted_at IS NULL")
         result = await db.execute(stmt, {"id": str(evidence_id)})
         record = result.fetchone()
 
@@ -227,7 +254,7 @@ def fetch_visual_from_microservice(file_path: str, visual_type: str) -> bytes:
 async def _proxy_visual(evidence_id: uuid.UUID, visual_type: str, db: AsyncSession):
     """Core logic to fetch physical file paths and route them to the ViT microservice."""
     try:
-        stmt = text("SELECT storage_uri FROM core.evidence WHERE id = :id")
+        stmt = text("SELECT storage_uri FROM core.evidence WHERE id = :id AND deleted_at IS NULL")
         result = await db.execute(stmt, {"id": str(evidence_id)})
         record = result.fetchone()
 
@@ -260,28 +287,66 @@ async def get_attention(evidence_id: uuid.UUID, db: AsyncSession = Depends(get_d
     return await _proxy_visual(evidence_id, "attention", db)
 
 
-@router.delete("/{evidence_id}", tags=["Evidence"], dependencies=[Depends(require_api_key)])
-async def delete_evidence(evidence_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
-    """Deletes evidence record, child dependencies, and the physical file."""
+@router.delete("/{evidence_id}", tags=["Evidence"])
+async def delete_evidence(
+    evidence_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserORM = Depends(get_current_user),
+):
+    """Soft-deletes evidence: stamps deleted_at so it disappears from the
+    ledger immediately, but the row and physical file are left alone so
+    restore_evidence can undo it within SOFT_DELETE_GRACE_PERIOD. Actual
+    purging (row + file) happens in api/worker.py's purge sweep - this used
+    to delete the file and row immediately, with no way back from a
+    misclick."""
     try:
-        stmt = text("SELECT storage_uri FROM core.evidence WHERE id = :id")
-        result = await db.execute(stmt, {"id": str(evidence_id)})
-        record = result.fetchone()
+        now = datetime.now(timezone.utc)
+        result = await db.execute(
+            text("UPDATE core.evidence SET deleted_at = :now WHERE id = :id AND deleted_at IS NULL RETURNING id"),
+            {"id": str(evidence_id), "now": now},
+        )
+        row = result.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Evidence not found")
 
-        if record:
-            file_path = Path(record.storage_uri)
-            if file_path.exists():
-                try:
-                    os.remove(file_path)
-                except OSError as e:
-                    logger.warning(f"Could not remove physical file {file_path}: {e}")
-
-        await db.execute(text("DELETE FROM analysis.analysis_jobs WHERE evidence_id = :id"), {"id": str(evidence_id)})
-        await db.execute(text("DELETE FROM core.evidence WHERE id = :id"), {"id": str(evidence_id)})
+        await db.execute(
+            text("""
+                INSERT INTO core.audit_events (id, resource_id, action, created_at, performed_by)
+                VALUES (:id, :resource_id, 'EVIDENCE_DELETED', :created_at, :performed_by)
+            """),
+            {"id": str(uuid.uuid4()), "resource_id": str(evidence_id), "created_at": now, "performed_by": current_user.email},
+        )
         await db.commit()
-        
-        return {"status": "success", "message": "Evidence completely purged."}
+        return {"status": "success", "message": "Evidence marked for deletion."}
+    except HTTPException:
+        raise
     except Exception as e:
         await db.rollback()
         logger.error(f"Deletion failed for {evidence_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Delete failed: {str(e)}")
+
+
+@router.post("/{evidence_id}/restore", tags=["Evidence"])
+async def restore_evidence(
+    evidence_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserORM = Depends(get_current_user),
+):
+    """Undoes delete_evidence within the grace period. Returns 404 once the
+    purge sweep has already physically removed it."""
+    try:
+        result = await db.execute(
+            text("UPDATE core.evidence SET deleted_at = NULL WHERE id = :id AND deleted_at IS NOT NULL RETURNING id"),
+            {"id": str(evidence_id)},
+        )
+        row = result.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Evidence not found or not deleted")
+
+        await db.commit()
+        return {"status": "success", "message": "Evidence restored."}
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Restore failed: {str(e)}")

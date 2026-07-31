@@ -1,0 +1,38 @@
+# Without this, `COPY . .` in the Dockerfile pulls .git history, both
+# node_modules trees, local venvs, and (worse) .env if one is ever sitting in
+# the build context, straight into the image layer.
+
+.git
+.github
+
+# Secrets - never let these end up in an image layer
+.env
+.env.*
+!.env.example
+
+# Frontend (built separately / not needed in the API image)
+frontend/node_modules
+frontend/dist
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# Local dev artifacts
+.docker/
+*.log
+pg_data/
+vault/
+nexus_storage_vault/
+nexus_db_data/
+
+# Editor / tool metadata
+.vscode/
+.idea/
+.claude/

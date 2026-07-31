@@ -7,7 +7,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.worker import poll_analysis_jobs
-from api.routers import cases, evidence, assessments, reports
+from api.routers import cases, evidence, assessments, reports, auth
 from infrastructure.persistence.database import engine
 
 logging.basicConfig(level=logging.INFO)
@@ -74,6 +74,7 @@ app.add_middleware(
 )
 
 # Domain routers
+app.include_router(auth.router, prefix="/api/v1/auth", tags=["Auth"])
 app.include_router(cases.router, prefix="/api/v1/cases", tags=["Cases"])
 app.include_router(evidence.router)
 app.include_router(assessments.router, prefix="/api/v1/assessments", tags=["Assessments"])

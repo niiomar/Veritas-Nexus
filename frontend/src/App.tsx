@@ -2,9 +2,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { AlertCircle, Trash2 } from 'lucide-react';
 
 import './index.css';
-import type { Case, Evidence, EngineStatus } from './types';
+import type { Case, Evidence, EngineStatus, AuthUser } from './types';
 import { EvidenceAPI } from './services/api';
 import { AssessmentEngine } from './services/assessment';
+import { AuthAPI, TokenStorage } from './services/auth';
 
 import { GlobalCommandBar } from './components/GlobalCommandBar';
 import { Sidebar } from './components/Sidebar';
@@ -13,8 +14,12 @@ import { EditCaseModal } from './components/EditCaseModal';
 import { DeleteCaseModal } from './components/DeleteCaseModal';
 import { IngestionPipeline } from './components/IngestionPipeline';
 import { DecisionWorkspace } from './components/DecisionWorkspace';
+import { AuthScreen } from './components/AuthScreen';
 
 export default function App() {
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -35,6 +40,24 @@ export default function App() {
   
   const [engineStatus, setEngineStatus] = useState<EngineStatus>({ vit: 'ONLINE', c2pa: 'ONLINE' });
   const [lastSync, setLastSync] = useState<string>('00:00');
+
+  // Validate any token left over from a previous session before rendering
+  // the main app - a stale/expired token should drop straight to AuthScreen
+  // rather than flashing the authenticated UI first.
+  useEffect(() => {
+    const token = TokenStorage.get();
+    if (!token) { setIsCheckingAuth(false); return; }
+
+    AuthAPI.me(token)
+      .then(setCurrentUser)
+      .catch(() => TokenStorage.clear())
+      .finally(() => setIsCheckingAuth(false));
+  }, []);
+
+  const handleLogout = useCallback(() => {
+    TokenStorage.clear();
+    setCurrentUser(null);
+  }, []);
 
   const syncDatabase = useCallback(async () => {
     try {
@@ -64,14 +87,16 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!currentUser) return;
+
     syncDatabase();
     fetchTelemetry();
-    
+
     const dbInterval = setInterval(syncDatabase, 3000);
     const telemetryInterval = setInterval(fetchTelemetry, 10000);
-    
+
     return () => { clearInterval(dbInterval); clearInterval(telemetryInterval); };
-  }, [syncDatabase, fetchTelemetry]);
+  }, [currentUser, syncDatabase, fetchTelemetry]);
 
   const handleUploadComplete = useCallback(() => {
     setIsUploading(false);
@@ -164,6 +189,18 @@ export default function App() {
   else if (pText.includes('med')) priorityColor = 'var(--c-system)';
   else if (pText.includes('low') || pText.includes('routine')) priorityColor = 'var(--c-trust)';
 
+  if (isCheckingAuth) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', backgroundColor: '#050505' }}>
+        <div className="mono animate-pulse" style={{ color: 'var(--text-muted)', fontSize: '12px', letterSpacing: '0.1em' }}>LOADING...</div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return <AuthScreen onAuthenticated={setCurrentUser} />;
+  }
+
   return (
     <>
       {uploadError && <div className="toast"><AlertCircle size={16} /> {uploadError}</div>}
@@ -223,7 +260,7 @@ export default function App() {
       </div>
 
       <div className="app-container" style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', backgroundColor: '#050505' }}>
-        <GlobalCommandBar />
+        <GlobalCommandBar userEmail={currentUser.email} onLogout={handleLogout} />
 
         <div className="main-layout" style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
           

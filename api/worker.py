@@ -4,11 +4,14 @@ import json
 import requests
 import os
 import mimetypes
+from datetime import datetime, timezone
+from pathlib import Path
 from dotenv import load_dotenv
 from sqlalchemy import select, text
 from infrastructure.persistence.database import async_session_maker
-from infrastructure.persistence.models import AnalysisJobORM, EvidenceORM
+from infrastructure.persistence.models import AnalysisJobORM, EvidenceORM, CaseORM
 from api.services.assessment_engine import evaluate_assessment
+from api.constants import SOFT_DELETE_GRACE_PERIOD
 
 load_dotenv()
 
@@ -259,8 +262,59 @@ async def execute_correlation_engine(job_id: str, evidence_id: str, session):
     await session.execute(update_stmt, {"report": json.dumps(report_data), "job_id": job_id})
     logger.info(f"[JOB {job_id}] Correlation Assessment complete.")
 
+
+def _remove_physical_file(storage_uri: str) -> None:
+    file_path = Path(storage_uri)
+    if file_path.exists():
+        try:
+            os.remove(file_path)
+        except OSError as e:
+            logger.warning(f"Could not remove physical file {file_path}: {e}")
+
+
+async def _purge_evidence(session, evidence_id) -> None:
+    await session.execute(text("DELETE FROM analysis.analysis_jobs WHERE evidence_id = :id"), {"id": str(evidence_id)})
+    await session.execute(text("DELETE FROM core.evidence WHERE id = :id"), {"id": str(evidence_id)})
+
+
+async def purge_expired_soft_deletes(session) -> None:
+    """Physically deletes (row + storage vault file) anything soft-deleted
+    past SOFT_DELETE_GRACE_PERIOD. api/routers/cases.py and
+    api/routers/evidence.py's DELETE endpoints only ever set deleted_at -
+    this is the only place a delete becomes actually irreversible."""
+    cutoff = datetime.now(timezone.utc) - SOFT_DELETE_GRACE_PERIOD
+
+    expired_evidence = (await session.execute(
+        select(EvidenceORM).where(EvidenceORM.deleted_at.isnot(None), EvidenceORM.deleted_at < cutoff)
+    )).scalars().all()
+    for ev in expired_evidence:
+        _remove_physical_file(ev.storage_uri)
+        await _purge_evidence(session, ev.id)
+
+    expired_cases = (await session.execute(
+        select(CaseORM).where(CaseORM.deleted_at.isnot(None), CaseORM.deleted_at < cutoff)
+    )).scalars().all()
+    for case in expired_cases:
+        # Cascading delete_case already stamps a case's evidence deleted_at
+        # at the same time, so it's normally purged above already - this
+        # catches anything left over (e.g. evidence added to an
+        # already-soft-deleted case, an edge case the API doesn't prevent).
+        leftover_evidence = (await session.execute(
+            select(EvidenceORM).where(EvidenceORM.case_id == case.id)
+        )).scalars().all()
+        for ev in leftover_evidence:
+            _remove_physical_file(ev.storage_uri)
+            await _purge_evidence(session, ev.id)
+        await session.execute(text("DELETE FROM core.cases WHERE id = :id"), {"id": str(case.id)})
+
+    if expired_evidence or expired_cases:
+        await session.commit()
+        logger.info(f"Purge sweep: removed {len(expired_evidence)} evidence item(s), {len(expired_cases)} case(s).")
+
+
 async def poll_analysis_jobs():
     logger.info("NSB Intelligence Worker is online and awaiting visual media...")
+    idle_cycles = 0
     while True:
         try:
             async with async_session_maker() as session:
@@ -274,6 +328,10 @@ async def poll_analysis_jobs():
                     await execute_correlation_engine(str(job.id), str(job.evidence_id), session)
                     await session.commit()
                 else:
+                    idle_cycles += 1
+                    if idle_cycles >= 20:  # ~once a minute at the 3s idle-poll cadence
+                        idle_cycles = 0
+                        await purge_expired_soft_deletes(session)
                     await asyncio.sleep(3)
         except Exception as e:
             logger.error(f"Worker Error: {str(e)}")

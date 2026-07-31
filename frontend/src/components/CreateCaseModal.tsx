@@ -8,15 +8,13 @@ interface CreateCaseModalProps {
 export const CreateCaseModal: React.FC<CreateCaseModalProps> = ({ onClose, onSubmit }) => {
   const [alias, setAlias] = useState('');
   const [name, setName] = useState('');
- 
-  // SET default priority to'LOW'
   const [priority, setPriority] = useState('LOW');
   const [analyst, setAnalyst] = useState('Analyst_01');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSubmit({
-      id: crypto.randomUUID(),  // Generates a valid UUID for the database
+      id: crypto.randomUUID(),
       alias: alias.toUpperCase(),
       name,
       priority,

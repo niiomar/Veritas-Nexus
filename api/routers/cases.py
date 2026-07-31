@@ -1,21 +1,16 @@
-import os
 import uuid
-import logging
 from datetime import datetime, timezone
-from pathlib import Path
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
-from api.dependencies import get_db_session, require_api_key
-
-logger = logging.getLogger("CasesRouter")
+from api.dependencies import get_db_session, get_current_user
+from infrastructure.persistence.models import UserORM
 
 router = APIRouter()
 
-# Updated to perfectly match the payload sent from frontend/src/services/api.ts
 class CaseRequest(BaseModel):
     title: str
     alias: str | None = None
@@ -23,22 +18,30 @@ class CaseRequest(BaseModel):
     analyst: str | None = None
     description: str | None = None
 
-@router.post("", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_api_key)])
+@router.post("", status_code=status.HTTP_201_CREATED)
 async def create_case(
     request: CaseRequest,
-    db: AsyncSession = Depends(get_db_session)
+    db: AsyncSession = Depends(get_db_session),
+    current_user: UserORM = Depends(get_current_user),
 ):
     """Opens a new investigation case."""
     now = datetime.now(timezone.utc)
     case_id = uuid.uuid4()
-    case_number = f"NSB-{now.year}-{now.strftime('%m%d%H%M')}"
-    actor = request.analyst or "SYSTEM"
+    # Minute-resolution alone collides under any real concurrent load (two
+    # analysts, a double-click, a batch import) and 500s on the unique
+    # constraint - the random suffix keeps the human-readable timestamp
+    # while making collisions practically impossible.
+    case_number = f"NSB-{now.year}-{now.strftime('%m%d%H%M%S')}-{uuid.uuid4().hex[:4].upper()}"
+    # created_by/audit trail use the authenticated user's identity, not the
+    # client-supplied `analyst` display field (which is just case metadata -
+    # who the case is assigned to - and shouldn't be trusted for accountability).
+    actor = current_user.email
 
     try:
         stmt = text("""
             INSERT INTO core.cases (id, case_number, title, alias, description, priority, analyst, status, created_by, created_at, updated_at, tags)
             VALUES (:id, :case_number, :title, :alias, :description, :priority, :analyst, 'OPEN', :created_by, :created_at, :updated_at, '{}')
-            RETURNING id, case_number, title, alias, priority, analyst, description, status, created_at
+            RETURNING id, case_number, title, alias, priority, analyst, description, created_at
         """)
         result = await db.execute(stmt, {
             "id": str(case_id),
@@ -76,11 +79,13 @@ async def create_case(
 async def list_cases(db: AsyncSession = Depends(get_db_session)):
     """Lists all cases. Cases are server-authoritative - the frontend used to
     cache them in localStorage only, which meant they vanished on a cleared
-    browser or a second device."""
+    browser or a second device. Soft-deleted cases (see delete_case) are
+    excluded until restored."""
     try:
         stmt = text("""
             SELECT id, title, alias, analyst, priority, created_at
             FROM core.cases
+            WHERE deleted_at IS NULL
             ORDER BY created_at DESC
         """)
         result = await db.execute(stmt)
@@ -109,17 +114,14 @@ async def get_case(case_id: UUID):
     return {"message": f"Details for case {case_id}"}
 
 
-# ==========================================
-# ADDED: Missing Endpoints to fix HTTP 405
-# ==========================================
-
-@router.put("/{case_id}", dependencies=[Depends(require_api_key)])
+@router.put("/{case_id}")
 async def update_case(
     case_id: UUID,
     request: CaseRequest,
-    db: AsyncSession = Depends(get_db_session)
+    db: AsyncSession = Depends(get_db_session),
+    current_user: UserORM = Depends(get_current_user),
 ):
-    """Updates an existing case. Fixes the 405 Method Not Allowed error."""
+    """Updates an existing case."""
     try:
         stmt = text("""
             UPDATE core.cases
@@ -152,38 +154,35 @@ async def update_case(
         raise HTTPException(status_code=500, detail=f"Failed to update case in PostgreSQL: {str(e)}")
 
 
-@router.delete("/{case_id}", dependencies=[Depends(require_api_key)])
+@router.delete("/{case_id}")
 async def delete_case(
     case_id: UUID,
-    db: AsyncSession = Depends(get_db_session)
+    db: AsyncSession = Depends(get_db_session),
+    current_user: UserORM = Depends(get_current_user),
 ):
-    """Deletes a case and cascades to its evidence, analysis jobs, and the
-    physical files in the storage vault - evidence.case_id has no ON DELETE
-    CASCADE at the DB level, so this has to be done explicitly or the delete
-    fails on the foreign key (or silently orphans the child rows)."""
+    """Soft-deletes a case and cascades to its (not-already-deleted)
+    evidence: both just get deleted_at stamped, so they disappear from
+    listings immediately but can be undone via restore_case within
+    SOFT_DELETE_GRACE_PERIOD. Physical files and DB rows aren't actually
+    removed until api/worker.py's purge sweep runs after that window -
+    deletion used to be immediate and irreversible, with no recovery path
+    for a misclick."""
     try:
-        evidence_stmt = text("SELECT id, storage_uri FROM core.evidence WHERE case_id = :case_id")
-        evidence_rows = (await db.execute(evidence_stmt, {"case_id": str(case_id)})).fetchall()
-
-        for ev in evidence_rows:
-            file_path = Path(ev.storage_uri)
-            if file_path.exists():
-                try:
-                    os.remove(file_path)
-                except OSError as e:
-                    logger.warning(f"Could not remove physical file {file_path}: {e}")
-
-        await db.execute(
-            text("DELETE FROM analysis.analysis_jobs WHERE evidence_id IN (SELECT id FROM core.evidence WHERE case_id = :case_id)"),
-            {"case_id": str(case_id)},
+        now = datetime.now(timezone.utc)
+        result = await db.execute(
+            text("UPDATE core.cases SET deleted_at = :now WHERE id = :id AND deleted_at IS NULL RETURNING id"),
+            {"id": str(case_id), "now": now},
         )
-        await db.execute(text("DELETE FROM core.evidence WHERE case_id = :case_id"), {"case_id": str(case_id)})
-
-        result = await db.execute(text("DELETE FROM core.cases WHERE id = :id RETURNING id"), {"id": str(case_id)})
         row = result.fetchone()
         if not row:
             await db.rollback()
             raise HTTPException(status_code=404, detail="Case not found")
+
+        evidence_result = await db.execute(
+            text("UPDATE core.evidence SET deleted_at = :now WHERE case_id = :case_id AND deleted_at IS NULL RETURNING id"),
+            {"case_id": str(case_id), "now": now},
+        )
+        evidence_count = len(evidence_result.fetchall())
 
         await db.execute(
             text("""
@@ -193,16 +192,49 @@ async def delete_case(
             {
                 "id": str(uuid.uuid4()),
                 "resource_id": str(case_id),
-                "created_at": datetime.now(timezone.utc),
-                "performed_by": "SYSTEM",
+                "created_at": now,
+                "performed_by": current_user.email,
             },
         )
         await db.commit()
 
-        return {"status": "success", "message": f"Case and {len(evidence_rows)} evidence item(s) deleted"}
+        return {"status": "success", "message": f"Case and {evidence_count} evidence item(s) marked for deletion"}
 
     except HTTPException:
         raise
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to delete case from PostgreSQL: {str(e)}")
+
+
+@router.post("/{case_id}/restore")
+async def restore_case(
+    case_id: UUID,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: UserORM = Depends(get_current_user),
+):
+    """Undoes delete_case within the grace period: clears deleted_at on the
+    case and on any of its evidence that was soft-deleted alongside it.
+    Returns 404 once the purge sweep has already physically removed it."""
+    try:
+        result = await db.execute(
+            text("UPDATE core.cases SET deleted_at = NULL WHERE id = :id AND deleted_at IS NOT NULL RETURNING id"),
+            {"id": str(case_id)},
+        )
+        row = result.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Case not found or not deleted")
+
+        await db.execute(
+            text("UPDATE core.evidence SET deleted_at = NULL WHERE case_id = :case_id AND deleted_at IS NOT NULL"),
+            {"case_id": str(case_id)},
+        )
+        await db.commit()
+
+        return {"status": "success", "message": "Case restored"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to restore case in PostgreSQL: {str(e)}")

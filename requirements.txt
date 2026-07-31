@@ -1,24 +1,33 @@
 # Delivery Layer
-fastapi==0.109.2
-uvicorn[standard]==0.27.1
-python-multipart==0.0.9
+fastapi==0.141.1
+uvicorn[standard]==0.52.0
+python-multipart==0.0.32
 
 # Domain & Validation
-pydantic==2.6.1
-pydantic-settings==2.1.0
+pydantic==2.13.4
+pydantic-settings==2.14.2
 
 # Infrastructure (Persistence & DB)
-sqlalchemy[asyncio]==2.0.25
-asyncpg==0.29.0
-alembic==1.13.1
-psycopg2-binary==2.9.9
+sqlalchemy[asyncio]==2.0.51
+asyncpg==0.31.0
+alembic==1.18.5
+psycopg2-binary==2.9.12
 
-Pillow==10.3.0
-imagehash==4.3.1
-opencv-python-headless==4.9.0.80
-numpy==1.26.4
+Pillow==12.3.0
+imagehash==4.3.2
+# Deliberately held on the 4.x line rather than the new 5.x major: nothing in
+# this repo's test suite exercises the OpenCV-dependent ELA/visual-forensics
+# path (api/services/exif_core.py), so there's no automated way to catch a
+# breaking API change from a major-version jump. Revisit once that path has
+# coverage.
+opencv-python-headless==4.14.0.94
+numpy==2.4.6
+
+# Auth
+bcrypt==5.0.0
+pyjwt==2.13.0
+email-validator==2.3.0
 
 # Utilities
-python-dotenv==1.0.1
-uuid6==2024.1.12
-requests>=2.31.0
+python-dotenv==1.2.2
+requests==2.34.2

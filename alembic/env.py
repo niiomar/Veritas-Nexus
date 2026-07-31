@@ -17,11 +17,16 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
+def get_url() -> str:
+    # Reuse the same DATABASE_URL the app itself reads (infrastructure/persistence/database.py),
+    # swapped to the sync psycopg2 driver alembic needs. This used to be hardcoded to the
+    # docker-compose DB, which made it impossible to point migrations at a test database.
+    url = os.getenv("DATABASE_URL", "postgresql+asyncpg://postgres:postgres_password@db:5432/veritas_nexus")
+    return url.replace("+asyncpg", "+psycopg2")
+
 def run_migrations_offline() -> None:
-    # Hardcoded URL for offline
-    url = "postgresql+psycopg2://postgres:postgres_password@db:5432/veritas_nexus"
     context.configure(
-        url=url,
+        url=get_url(),
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -30,9 +35,8 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 def run_migrations_online() -> None:
-    # Hardcoded URL for online - using psycopg2 for migrations
     connectable = create_engine(
-        "postgresql+psycopg2://postgres:postgres_password@db:5432/veritas_nexus",
+        get_url(),
         poolclass=pool.NullPool,
     )
 

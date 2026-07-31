@@ -1,4 +1,8 @@
-export type ThreatPriority = "Critical" | "High" | "Routine";
+// Matches the backend's CasePriority enum (domain/models.py used to define this
+// before it was removed; api/routers/cases.py is the live source of truth now).
+// This used to say "Critical" | "High" | "Routine", which never matched what
+// CreateCaseModal/EditCaseModal actually send - it provided no real type safety.
+export type ThreatPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
 export interface Case {
   id: string;
@@ -25,9 +29,9 @@ export interface C2PAData {
   raw_status: string;
   issuer: string | null;
   algorithm: string | null;
-  timestamp: string | null; // Changed to string to handle actual UTC dates
+  timestamp: string | null;
   error?: string | null;
-  manifest_history?: C2PAAction[]; // added for the Provenance Graph
+  manifest_history?: C2PAAction[];
 }
 
 export interface AIReport {
@@ -67,4 +71,11 @@ export interface EvidenceAssessment {
 export interface EngineStatus {
   vit: 'ONLINE' | 'OFFLINE' | 'DEGRADED';
   c2pa: 'ONLINE' | 'OFFLINE' | 'DEGRADED';
+}
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  role: string;
+  is_verified: boolean;
 }

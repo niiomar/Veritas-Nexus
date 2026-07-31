@@ -3,8 +3,7 @@ import { Fingerprint, CheckCircle, Hash, Link2, Network, UploadCloud } from 'luc
 import type { Case } from '../types';
 import { EvidenceAPI } from '../services/api';
 
-// useVit and useC2pa parameters to the component props
-export const IngestionPipeline: React.FC<{ 
+export const IngestionPipeline: React.FC<{
   file: File, 
   activeCase: Case, 
   useVit: boolean, 
@@ -35,7 +34,6 @@ export const IngestionPipeline: React.FC<{
         await sleep(500);
         if (!isMounted) return;
         
-        // Passing the boolean toggles down to the API function
         await EvidenceAPI.uploadPayload(file, activeCase.id, activeCase.analyst, useVit, useC2pa);
         
         advance(5);
