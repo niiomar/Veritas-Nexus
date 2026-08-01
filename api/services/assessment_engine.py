@@ -9,11 +9,12 @@ the INVALID/BROKEN_SIGNATURE mismatch this replaced). It now runs once,
 server-side, at analysis completion time, and the frontend just renders the
 stored result.
 
-Deliberately kept as a line-for-line port, bugs and all (e.g. a failed EXIF
-extraction still scores "metadata present" in the Metadata Integrity domain
-because the original only checked for the *presence* of the exif dict, not
-its status) - this is a straight relocation of existing behavior, not a
-redesign.
+Kept as a near line-for-line port, with one deliberate correction: the
+Metadata Integrity domain now checks that EXIF extraction actually
+*succeeded* (exif_core.py returns {"status": "FAILED", ...} on error)
+rather than just that the dict is non-empty - the original awarded "EXIF
+Profile Present" points even when extraction had failed, which is the
+opposite of what a forensic authenticity score should do.
 """
 from typing import Any, Dict, List, Optional
 
@@ -77,7 +78,7 @@ def evaluate_assessment(ai_report: Dict[str, Any], exif: Optional[Dict[str, Any]
 
     # Domain 3: Metadata Integrity (Max 15) - Pure Additive
     meta_ev: List[dict] = []
-    if exif and not anomalies.get("likely_stripped"):
+    if exif and exif.get("status") != "FAILED" and not anomalies.get("likely_stripped"):
         meta_score = 5
         meta_ev.append({"text": "EXIF Profile Present", "effect": "Positive", "pts": 5})
         if anomalies.get("gps_present"):

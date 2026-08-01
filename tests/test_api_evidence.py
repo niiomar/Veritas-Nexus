@@ -42,6 +42,21 @@ async def test_ingest_evidence_requires_authentication(api_client, auth_headers)
 
 
 @pytest.mark.asyncio
+async def test_list_evidence_requires_authentication(api_client):
+    response = await api_client.get("/api/v1/evidence/")
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_download_evidence_file_requires_authentication(api_client, auth_headers):
+    case_id = await _create_case(api_client, auth_headers)
+    evidence_id = await _upload_evidence(api_client, auth_headers, case_id)
+
+    response = await api_client.get(f"/api/v1/evidence/{evidence_id}/download")
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
 async def test_ingest_and_list_evidence(api_client, auth_headers):
     case_id = await _create_case(api_client, auth_headers)
     files = {"file": ("test.png", _TINY_PNG, "image/png")}
@@ -54,7 +69,7 @@ async def test_ingest_and_list_evidence(api_client, auth_headers):
     evidence_id = body["evidence_id"]
     assert len(body["sha256"]) == 64
 
-    listing = await api_client.get("/api/v1/evidence/")
+    listing = await api_client.get("/api/v1/evidence/", headers=auth_headers)
     assert listing.status_code == 200
     ids = [e["id"] for e in listing.json()["evidence"]]
     assert evidence_id in ids
@@ -83,7 +98,7 @@ async def test_delete_evidence_removes_it_from_the_list(api_client, auth_headers
     delete = await api_client.delete(f"/api/v1/evidence/{evidence_id}", headers=auth_headers)
     assert delete.status_code == 200
 
-    listing = await api_client.get("/api/v1/evidence/")
+    listing = await api_client.get("/api/v1/evidence/", headers=auth_headers)
     ids = [e["id"] for e in listing.json()["evidence"]]
     assert evidence_id not in ids
 
@@ -101,7 +116,7 @@ async def test_deleting_a_case_cascades_to_its_evidence(api_client, auth_headers
     delete_case = await api_client.delete(f"/api/v1/cases/{case_id}", headers=auth_headers)
     assert delete_case.status_code == 200
 
-    listing = await api_client.get("/api/v1/evidence/")
+    listing = await api_client.get("/api/v1/evidence/", headers=auth_headers)
     ids = [e["id"] for e in listing.json()["evidence"]]
     assert evidence_id not in ids
 
@@ -152,7 +167,7 @@ async def test_restore_evidence_undoes_the_delete(api_client, auth_headers):
     restore = await api_client.post(f"/api/v1/evidence/{evidence_id}/restore", headers=auth_headers)
     assert restore.status_code == 200
 
-    listing = await api_client.get("/api/v1/evidence/")
+    listing = await api_client.get("/api/v1/evidence/", headers=auth_headers)
     ids = [e["id"] for e in listing.json()["evidence"]]
     assert evidence_id in ids
 
@@ -169,10 +184,10 @@ async def test_restoring_a_case_also_restores_its_cascaded_evidence(api_client, 
     restore = await api_client.post(f"/api/v1/cases/{case_id}/restore", headers=auth_headers)
     assert restore.status_code == 200
 
-    cases_listing = await api_client.get("/api/v1/cases")
+    cases_listing = await api_client.get("/api/v1/cases", headers=auth_headers)
     assert case_id in [c["id"] for c in cases_listing.json()["cases"]]
 
-    evidence_listing = await api_client.get("/api/v1/evidence/")
+    evidence_listing = await api_client.get("/api/v1/evidence/", headers=auth_headers)
     assert evidence_id in [e["id"] for e in evidence_listing.json()["evidence"]]
 
 
@@ -181,7 +196,7 @@ async def test_list_evidence_reports_total_independent_of_limit(api_client, auth
     case_id = await _create_case(api_client, auth_headers, title="Pagination Total Case")
     ids = [await _upload_evidence(api_client, auth_headers, case_id) for _ in range(3)]
 
-    response = await api_client.get("/api/v1/evidence/", params={"case_id": case_id, "limit": 1})
+    response = await api_client.get("/api/v1/evidence/", params={"case_id": case_id, "limit": 1}, headers=auth_headers)
     body = response.json()
     assert body["total"] == 3, "total must reflect the full matching set, not just the page returned"
     assert len(body["evidence"]) == 1
@@ -197,7 +212,7 @@ async def test_list_evidence_limit_and_offset_paginate_without_gaps_or_dupes(api
     page_size = 2
     while True:
         response = await api_client.get(
-            "/api/v1/evidence/", params={"case_id": case_id, "limit": page_size, "offset": offset}
+            "/api/v1/evidence/", params={"case_id": case_id, "limit": page_size, "offset": offset}, headers=auth_headers
         )
         page = response.json()["evidence"]
         if not page:
@@ -215,7 +230,7 @@ async def test_list_evidence_case_id_filter_excludes_other_cases(api_client, aut
     evidence_a = await _upload_evidence(api_client, auth_headers, case_a)
     evidence_b = await _upload_evidence(api_client, auth_headers, case_b)
 
-    response = await api_client.get("/api/v1/evidence/", params={"case_id": case_a})
+    response = await api_client.get("/api/v1/evidence/", params={"case_id": case_a}, headers=auth_headers)
     ids = [e["id"] for e in response.json()["evidence"]]
     assert evidence_a in ids
     assert evidence_b not in ids
@@ -225,6 +240,6 @@ async def test_list_evidence_case_id_filter_excludes_other_cases(api_client, aut
 async def test_list_evidence_limit_is_capped_not_rejected(api_client, auth_headers):
     """An absurd limit shouldn't 400 or run an unbounded query - it should
     just be clamped to a sane ceiling."""
-    response = await api_client.get("/api/v1/evidence/", params={"limit": 999999})
+    response = await api_client.get("/api/v1/evidence/", params={"limit": 999999}, headers=auth_headers)
     assert response.status_code == 200
     assert response.json()["limit"] == 2000

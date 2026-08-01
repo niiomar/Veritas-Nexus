@@ -19,7 +19,7 @@ export const DeleteCaseModal: React.FC<DeleteCaseModalProps> = ({ caseToDelete, 
         <div style={{ color: 'var(--text-main)', fontSize: '14px', lineHeight: '1.6', marginBottom: '32px' }}>
           Are you sure you want to delete <span className="mono" style={{ color: 'var(--text-main)', fontWeight: 600 }}>{caseToDelete.alias}</span>? 
           <br /><br />
-          <span style={{ color: 'var(--text-muted)' }}>This action cannot be undone and will permanently wipe all cascading evidence from the database.</span>
+          <span style={{ color: 'var(--text-muted)' }}>This will hide the case and its evidence immediately. You'll have a short window to undo it before it's permanently purged.</span>
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>

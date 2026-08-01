@@ -77,6 +77,19 @@ def _bind_app_to_test_database(postgres_database_url):
     yield
 
 
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter():
+    """api/rate_limiting.py's Limiter is a module-level singleton shared by
+    every test in this session (each test gets its own FastAPI() app, but
+    they all import the same Limiter instance) - without resetting it here,
+    tests that hit /auth/register or /auth/login enough times would start
+    tripping 429s against each other instead of the app they're testing."""
+    from api.rate_limiting import limiter
+
+    limiter.reset()
+    yield
+
+
 @pytest_asyncio.fixture
 async def api_client(_bind_app_to_test_database):
     """An httpx.AsyncClient wired directly to the real FastAPI app (routers
@@ -109,8 +122,7 @@ async def db_session(_bind_app_to_test_database):
         yield session
 
 
-@pytest_asyncio.fixture
-async def registered_user(api_client, db_session):
+async def _register_and_verify(api_client, db_session) -> dict:
     """Registers a fresh user with a unique email, then bypasses real email
     delivery (there's no SMTP in tests) by verifying them directly in the DB
     - api/routers/auth.py's actual verify_email flow is covered separately
@@ -127,15 +139,37 @@ async def registered_user(api_client, db_session):
     return {"email": email, "password": TEST_PASSWORD}
 
 
+async def _login_headers(api_client, credentials: dict) -> dict:
+    login = await api_client.post(
+        "/api/v1/auth/login",
+        json={"email": credentials["email"], "password": credentials["password"]},
+    )
+    assert login.status_code == 200, login.text
+    token = login.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest_asyncio.fixture
+async def registered_user(api_client, db_session):
+    return await _register_and_verify(api_client, db_session)
+
+
 @pytest_asyncio.fixture
 async def auth_headers(api_client, registered_user):
     """A valid Authorization header for a freshly registered + verified
     user, for tests that just need *some* authenticated identity and don't
     care whose."""
-    login = await api_client.post(
-        "/api/v1/auth/login",
-        json={"email": registered_user["email"], "password": registered_user["password"]},
-    )
-    assert login.status_code == 200, login.text
-    token = login.json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+    return await _login_headers(api_client, registered_user)
+
+
+@pytest_asyncio.fixture
+async def other_registered_user(api_client, db_session):
+    """A second, distinct verified user - for tests asserting that shared
+    team visibility doesn't also mean shared edit/delete rights (see
+    test_authorization_boundaries.py)."""
+    return await _register_and_verify(api_client, db_session)
+
+
+@pytest_asyncio.fixture
+async def other_auth_headers(api_client, other_registered_user):
+    return await _login_headers(api_client, other_registered_user)

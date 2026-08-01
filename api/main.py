@@ -5,9 +5,13 @@ from contextlib import asynccontextmanager
 from urllib.parse import urlparse
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from api.worker import poll_analysis_jobs
 from api.routers import cases, evidence, assessments, reports, auth
+from api.rate_limiting import limiter
+from api.services import auth_service
 from infrastructure.persistence.database import engine
 
 logging.basicConfig(level=logging.INFO)
@@ -40,7 +44,16 @@ async def is_service_reachable(host: str, port: int, timeout: float = 1.0) -> bo
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Veritas Nexus API starting up...")
-    
+
+    # Fail fast on a misconfigured deployment: without this, the app comes
+    # up looking healthy and JWT_SECRET's absence only surfaces on the
+    # first login/register attempt.
+    if not auth_service.JWT_SECRET:
+        raise RuntimeError(
+            "JWT_SECRET is not set. Generate one with "
+            "`python -c \"import secrets; print(secrets.token_urlsafe(32))\"` and put it in .env."
+        )
+
     # 1. Fire up the background worker task and save a reference to app state
     worker_task = asyncio.create_task(poll_analysis_jobs())
     app.state.worker_task = worker_task
@@ -65,9 +78,19 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Comma-separated list, e.g. "https://app.example.com,https://staging.example.com".
+# Defaults cover local dev only - a production deploy must set this explicitly
+# rather than the previous hardcoded localhost-only origins.
+# `or` (not getenv's default=) because docker-compose passes CORS_ORIGINS="" -
+# an empty string, not an absent var - whenever it's undefined in .env (see
+# the SMTP_PORT bug this same pattern caused).
+_cors_origins = os.getenv("CORS_ORIGINS") or "http://localhost:5173,http://127.0.0.1:5173"
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=[origin.strip() for origin in _cors_origins.split(",") if origin.strip()],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

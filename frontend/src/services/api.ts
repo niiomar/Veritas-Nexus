@@ -89,6 +89,15 @@ export const EvidenceAPI = {
     return true;
   },
 
+  restoreCase: async (caseId: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/v1/cases/${caseId}/restore`, {
+      method: 'POST',
+      headers: authHeaders(),
+    });
+    if (!response.ok) throw new Error(parseFastAPIError(await response.json().catch(()=>null), 'Failed to restore case'));
+    return true;
+  },
+
   uploadPayload: async (file: File, caseId: string, uploadedBy: string = "Analyst_01", useVit: boolean = true, useC2pa: boolean = true) => {
     const formData = new FormData();
     formData.append("file", file);
@@ -114,6 +123,15 @@ export const EvidenceAPI = {
       headers: authHeaders(),
     });
     if (!response.ok) throw new Error(parseFastAPIError(await response.json().catch(()=>null), 'Failed to delete evidence'));
+    return true;
+  },
+
+  restoreEvidence: async (evidenceId: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/v1/evidence/${evidenceId}/restore`, {
+      method: 'POST',
+      headers: authHeaders(),
+    });
+    if (!response.ok) throw new Error(parseFastAPIError(await response.json().catch(()=>null), 'Failed to restore evidence'));
     return true;
   }
 };

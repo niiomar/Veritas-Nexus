@@ -37,10 +37,56 @@ async def test_list_cases_includes_created_case(api_client, auth_headers):
     )
     case_id = create.json()["case_id"]
 
-    listing = await api_client.get("/api/v1/cases")
+    listing = await api_client.get("/api/v1/cases", headers=auth_headers)
     assert listing.status_code == 200
     ids = [c["id"] for c in listing.json()["cases"]]
     assert case_id in ids
+
+
+@pytest.mark.asyncio
+async def test_list_cases_requires_authentication(api_client):
+    response = await api_client.get("/api/v1/cases")
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_get_case_requires_authentication(api_client, auth_headers):
+    create = await api_client.post(
+        "/api/v1/cases",
+        json={"title": "Detail Case", "priority": "LOW", "analyst": "Analyst_02"},
+        headers=auth_headers,
+    )
+    case_id = create.json()["case_id"]
+
+    response = await api_client.get(f"/api/v1/cases/{case_id}")
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_get_case_returns_full_detail(api_client, auth_headers):
+    create = await api_client.post(
+        "/api/v1/cases",
+        json={"title": "Detail Case", "alias": "CASE-DET", "priority": "HIGH", "analyst": "Analyst_02", "description": "A description"},
+        headers=auth_headers,
+    )
+    case_id = create.json()["case_id"]
+
+    response = await api_client.get(f"/api/v1/cases/{case_id}", headers=auth_headers)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["id"] == case_id
+    assert body["name"] == "Detail Case"
+    assert body["alias"] == "CASE-DET"
+    assert body["description"] == "A description"
+    assert body["status"] == "OPEN"
+
+
+@pytest.mark.asyncio
+async def test_get_nonexistent_case_returns_404(api_client, auth_headers):
+    response = await api_client.get(
+        "/api/v1/cases/00000000-0000-0000-0000-000000000000", headers=auth_headers
+    )
+    assert response.status_code == 404
 
 
 @pytest.mark.asyncio
@@ -100,7 +146,7 @@ async def test_delete_case_removes_it_from_the_list(api_client, auth_headers):
     delete = await api_client.delete(f"/api/v1/cases/{case_id}", headers=auth_headers)
     assert delete.status_code == 200
 
-    listing = await api_client.get("/api/v1/cases")
+    listing = await api_client.get("/api/v1/cases", headers=auth_headers)
     ids = [c["id"] for c in listing.json()["cases"]]
     assert case_id not in ids
 
@@ -162,7 +208,7 @@ async def test_restore_case_undoes_the_delete(api_client, auth_headers):
     restore = await api_client.post(f"/api/v1/cases/{case_id}/restore", headers=auth_headers)
     assert restore.status_code == 200
 
-    listing = await api_client.get("/api/v1/cases")
+    listing = await api_client.get("/api/v1/cases", headers=auth_headers)
     ids = [c["id"] for c in listing.json()["cases"]]
     assert case_id in ids
 

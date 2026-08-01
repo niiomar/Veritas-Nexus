@@ -1,3 +1,4 @@
+import logging
 import uuid
 from datetime import datetime, timezone
 from uuid import UUID
@@ -9,6 +10,7 @@ from sqlalchemy import text
 from api.dependencies import get_db_session, get_current_user
 from infrastructure.persistence.models import UserORM
 
+logger = logging.getLogger("CasesRouter")
 router = APIRouter()
 
 class CaseRequest(BaseModel):
@@ -68,22 +70,28 @@ async def create_case(
         })
 
         await db.commit()
-    except Exception as e:
+    except Exception:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to create case in PostgreSQL: {str(e)}")
+        logger.exception("Failed to create case")
+        raise HTTPException(status_code=500, detail="Failed to create case.")
 
     row = result.mappings().fetchone()
     return {"status": "success", "case_id": str(case_id), **dict(row)}
 
 @router.get("")
-async def list_cases(db: AsyncSession = Depends(get_db_session)):
-    """Lists all cases. Cases are server-authoritative - the frontend used to
-    cache them in localStorage only, which meant they vanished on a cleared
-    browser or a second device. Soft-deleted cases (see delete_case) are
-    excluded until restored."""
+async def list_cases(
+    db: AsyncSession = Depends(get_db_session),
+    current_user: UserORM = Depends(get_current_user),
+):
+    """Lists all cases visible to any authenticated analyst (shared team
+    caseload - see get_case/update_case/delete_case for the ownership check
+    that gates mutations). Cases are server-authoritative - the frontend
+    used to cache them in localStorage only, which meant they vanished on a
+    cleared browser or a second device. Soft-deleted cases (see delete_case)
+    are excluded until restored."""
     try:
         stmt = text("""
-            SELECT id, title, alias, analyst, priority, created_at
+            SELECT id, title, alias, analyst, priority, created_by, created_at
             FROM core.cases
             WHERE deleted_at IS NULL
             ORDER BY created_at DESC
@@ -99,19 +107,66 @@ async def list_cases(db: AsyncSession = Depends(get_db_session)):
                     "alias": row["alias"] or "",
                     "analyst": row["analyst"] or "",
                     "priority": row["priority"],
+                    "created_by": row["created_by"],
                     "created": row["created_at"].date().isoformat(),
                 }
                 for row in rows
             ]
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch cases: {str(e)}")
+    except Exception:
+        logger.exception("Failed to fetch cases")
+        raise HTTPException(status_code=500, detail="Failed to fetch cases.")
 
 
 @router.get("/{case_id}")
-async def get_case(case_id: UUID):
-    # This would route to a GetCaseQuery handler in CQRS
-    return {"message": f"Details for case {case_id}"}
+async def get_case(
+    case_id: UUID,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: UserORM = Depends(get_current_user),
+):
+    """Fetches a single case. Any authenticated analyst may view any case
+    (shared caseload) - only the creator may mutate it (see update/delete)."""
+    stmt = text("""
+        SELECT id, case_number, title, alias, analyst, priority, status, description, created_by, created_at, updated_at
+        FROM core.cases
+        WHERE id = :id AND deleted_at IS NULL
+    """)
+    result = await db.execute(stmt, {"id": str(case_id)})
+    row = result.mappings().fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    return {
+        "id": str(row["id"]),
+        "case_number": row["case_number"],
+        "name": row["title"],
+        "alias": row["alias"] or "",
+        "analyst": row["analyst"] or "",
+        "priority": row["priority"],
+        "status": row["status"],
+        "description": row["description"] or "",
+        "created_by": row["created_by"],
+        "created": row["created_at"].date().isoformat(),
+        "updated_at": row["updated_at"].isoformat(),
+    }
+
+
+async def _require_case_owner(db: AsyncSession, case_id: UUID, current_user: UserORM) -> None:
+    """Shared team visibility means any analyst can read a case, but only
+    its creator may mutate it - without this, any registered account could
+    retitle, delete, or restore any other analyst's investigation. Doesn't
+    filter on deleted_at - existence + ownership only, since this guards
+    update/delete/restore alike and each of those enforces its own
+    deleted_at state transition afterwards."""
+    result = await db.execute(
+        text("SELECT created_by FROM core.cases WHERE id = :id"),
+        {"id": str(case_id)},
+    )
+    row = result.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Case not found")
+    if row.created_by != current_user.email:
+        raise HTTPException(status_code=403, detail="Only the case's creator may perform this action.")
 
 
 @router.put("/{case_id}")
@@ -121,12 +176,14 @@ async def update_case(
     db: AsyncSession = Depends(get_db_session),
     current_user: UserORM = Depends(get_current_user),
 ):
-    """Updates an existing case."""
+    """Updates an existing case. Only the case's creator may do so (see
+    _require_case_owner)."""
+    await _require_case_owner(db, case_id, current_user)
     try:
         stmt = text("""
             UPDATE core.cases
             SET title = :title, alias = :alias, priority = :priority, analyst = :analyst, description = :description, updated_at = :updated_at
-            WHERE id = :id
+            WHERE id = :id AND deleted_at IS NULL
             RETURNING id, title, alias, priority, analyst, description
         """)
 
@@ -149,9 +206,10 @@ async def update_case(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to update case in PostgreSQL: {str(e)}")
+        logger.exception(f"Failed to update case {case_id}")
+        raise HTTPException(status_code=500, detail="Failed to update case.")
 
 
 @router.delete("/{case_id}")
@@ -166,7 +224,9 @@ async def delete_case(
     SOFT_DELETE_GRACE_PERIOD. Physical files and DB rows aren't actually
     removed until api/worker.py's purge sweep runs after that window -
     deletion used to be immediate and irreversible, with no recovery path
-    for a misclick."""
+    for a misclick. Only the case's creator may delete it (see
+    _require_case_owner)."""
+    await _require_case_owner(db, case_id, current_user)
     try:
         now = datetime.now(timezone.utc)
         result = await db.execute(
@@ -202,9 +262,10 @@ async def delete_case(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to delete case from PostgreSQL: {str(e)}")
+        logger.exception(f"Failed to delete case {case_id}")
+        raise HTTPException(status_code=500, detail="Failed to delete case.")
 
 
 @router.post("/{case_id}/restore")
@@ -215,7 +276,9 @@ async def restore_case(
 ):
     """Undoes delete_case within the grace period: clears deleted_at on the
     case and on any of its evidence that was soft-deleted alongside it.
-    Returns 404 once the purge sweep has already physically removed it."""
+    Returns 404 once the purge sweep has already physically removed it.
+    Only the case's creator may restore it (see _require_case_owner)."""
+    await _require_case_owner(db, case_id, current_user)
     try:
         result = await db.execute(
             text("UPDATE core.cases SET deleted_at = NULL WHERE id = :id AND deleted_at IS NOT NULL RETURNING id"),
@@ -235,6 +298,7 @@ async def restore_case(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to restore case in PostgreSQL: {str(e)}")
+        logger.exception(f"Failed to restore case {case_id}")
+        raise HTTPException(status_code=500, detail="Failed to restore case.")

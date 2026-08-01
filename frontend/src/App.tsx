@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { AlertCircle, Trash2 } from 'lucide-react';
 
 import './index.css';
@@ -37,7 +37,20 @@ export default function App() {
   const [caseToDelete, setCaseToDelete] = useState<Case | null>(null);
   
   const [evidenceToDelete, setEvidenceToDelete] = useState<Evidence | null>(null);
-  
+
+  // Soft-deletes are recoverable server-side for a 24h grace period (see
+  // api/constants.py's SOFT_DELETE_GRACE_PERIOD), but a user has no reason
+  // to know that without a prompt right after the action - this surfaces a
+  // short-lived Undo affordance for the "oops, wrong item" case.
+  const [undoAction, setUndoAction] = useState<{ message: string; onUndo: () => void } | null>(null);
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const offerUndo = useCallback((message: string, onUndo: () => void) => {
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    setUndoAction({ message, onUndo });
+    undoTimerRef.current = setTimeout(() => setUndoAction(null), 8000);
+  }, []);
+
   const [engineStatus, setEngineStatus] = useState<EngineStatus>({ vit: 'ONLINE', c2pa: 'ONLINE' });
   const [lastSync, setLastSync] = useState<string>('00:00');
 
@@ -148,14 +161,21 @@ export default function App() {
 
   const confirmDeleteCase = async () => {
     if (!caseToDelete) return;
+    const deletedCaseId = caseToDelete.id;
+    const deletedCaseName = caseToDelete.name;
     try {
-      await EvidenceAPI.deleteCase(caseToDelete.id);
-      if (activeCase?.id === caseToDelete.id) {
+      await EvidenceAPI.deleteCase(deletedCaseId);
+      if (activeCase?.id === deletedCaseId) {
         setActiveCase(null);
         setSelectedEvidence(null);
       }
       await syncDatabase();
       setCaseToDelete(null);
+      offerUndo(`Case "${deletedCaseName}" deleted.`, async () => {
+        await EvidenceAPI.restoreCase(deletedCaseId);
+        await syncDatabase();
+        setUndoAction(null);
+      });
     } catch (err: any) {
       setUploadError(`Case Deletion Failed: ${err.message}`);
       setTimeout(() => setUploadError(null), 5000);
@@ -164,13 +184,19 @@ export default function App() {
 
   const confirmDeleteEvidence = async () => {
     if (!evidenceToDelete) return;
-    
+    const deletedEvidenceId = evidenceToDelete.id;
+
     try {
-      await EvidenceAPI.deleteEvidence(evidenceToDelete.id);
-      if (selectedEvidence?.id === evidenceToDelete.id) {
+      await EvidenceAPI.deleteEvidence(deletedEvidenceId);
+      if (selectedEvidence?.id === deletedEvidenceId) {
         setSelectedEvidence(null);
       }
-      syncDatabase();
+      await syncDatabase();
+      offerUndo('Evidence deleted.', async () => {
+        await EvidenceAPI.restoreEvidence(deletedEvidenceId);
+        await syncDatabase();
+        setUndoAction(null);
+      });
     } catch (err: any) {
       setUploadError(err.message || 'Failed to delete evidence.');
       setTimeout(() => setUploadError(null), 5000);
@@ -204,6 +230,12 @@ export default function App() {
   return (
     <>
       {uploadError && <div className="toast"><AlertCircle size={16} /> {uploadError}</div>}
+      {undoAction && (
+        <div className="toast-undo mono">
+          {undoAction.message}
+          <button onClick={undoAction.onUndo}>UNDO</button>
+        </div>
+      )}
 
       <div style={{ position: 'relative', zIndex: 999 }}>
         {isCreateModalOpen && (
@@ -230,7 +262,7 @@ export default function App() {
               <div style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.6' }}>
                 Are you sure you want to purge the asset <strong style={{ color: 'var(--text-main)', fontWeight: 600 }}>{evidenceToDelete.filename.split('_').slice(1).join('_') || evidenceToDelete.filename}</strong>? 
                 <br /><br />
-                This action is irreversible and will permanently erase the item from the ledger and secure vault.
+                This will hide the item immediately. You'll have a short window to undo it before it's permanently purged.
               </div>
               
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '4px' }}>

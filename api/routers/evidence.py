@@ -41,33 +41,42 @@ if not VIT_CORE_API_KEY:
     logger.warning("VIT_CORE_API_KEY is not set - requests to the ViT-CORE engine will fail authentication.")
 
 
+def _write_and_hash_evidence(file_obj, file_path: Path) -> str:
+    """Runs on a worker thread (see asyncio.to_thread below) - the disk
+    write and full-file SHA-256 read used to run inline in the async
+    handler, blocking the event loop (and every other concurrent request)
+    for the duration of the upload."""
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file_obj, buffer)
+
+    sha256_hash = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        for byte_block in iter(lambda: f.read(4096), b""):
+            sha256_hash.update(byte_block)
+    return sha256_hash.hexdigest()
+
+
 @router.post("/")
 async def ingest_evidence(
     case_id: uuid.UUID = Form(...),
-    uploaded_by: str = Form(...),
     file: UploadFile = File(...),
     use_vit: bool = Form(True),
     use_c2pa: bool = Form(True),
     db: AsyncSession = Depends(get_db),
     current_user: UserORM = Depends(get_current_user),
 ):
-    
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Uploaded file has no filename.")
+
     try:
         STORAGE_VAULT.mkdir(parents=True, exist_ok=True)
         evidence_id = uuid.uuid4()
-        
+
         safe_filename = "".join(c for c in file.filename if c.isalnum() or c in "._-")
         storage_filename = f"{evidence_id}_{safe_filename}"
         file_path = STORAGE_VAULT / storage_filename
 
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
-        sha256_hash = hashlib.sha256()
-        with open(file_path, "rb") as f:
-            for byte_block in iter(lambda: f.read(4096), b""):
-                sha256_hash.update(byte_block)
-        file_hash = sha256_hash.hexdigest()
+        file_hash = await asyncio.to_thread(_write_and_hash_evidence, file.file, file_path)
 
         # RUN METADATA EXTRACTION IMMEDIATELY ON INGEST
         # Offloaded to a worker thread: this shells out to exiftool and runs
@@ -85,7 +94,10 @@ async def ingest_evidence(
             original_filename=file.filename,
             sha256=file_hash,
             storage_uri=str(file_path),
-            uploaded_by=uploaded_by,
+            # Server-authoritative, like cases.py's created_by - a client-
+            # supplied uploader field is spoofable and undermines chain of
+            # custody.
+            uploaded_by=current_user.email,
             uploaded_at=now,
             metadata_dict={
                 "content_type": file.content_type,
@@ -123,14 +135,16 @@ async def ingest_evidence(
             "message": "Evidence secured and queued for forensic analysis."
         }
 
-    except Exception as e:
+    except Exception:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Ingestion failed: {str(e)}")
+        logger.exception("Evidence ingestion failed")
+        raise HTTPException(status_code=500, detail="Ingestion failed.")
 
 
 @router.get("/")
 async def list_evidence(
     db: AsyncSession = Depends(get_db),
+    current_user: UserORM = Depends(get_current_user),
     case_id: uuid.UUID | None = None,
     limit: int = 500,
     offset: int = 0,
@@ -187,11 +201,16 @@ async def list_evidence(
 
         return {"evidence": evidence_list, "total": total, "limit": limit, "offset": offset}
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch library: {str(e)}")
+    except Exception:
+        logger.exception("Failed to fetch evidence library")
+        raise HTTPException(status_code=500, detail="Failed to fetch library.")
 
 @router.get("/{evidence_id}/download")
-async def get_evidence_file(evidence_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def get_evidence_file(
+    evidence_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserORM = Depends(get_current_user),
+):
     """Serves the raw physical file for the SOURCE tab."""
     try:
         stmt = text("SELECT storage_uri FROM core.evidence WHERE id = :id AND deleted_at IS NULL")
@@ -204,8 +223,9 @@ async def get_evidence_file(evidence_id: uuid.UUID, db: AsyncSession = Depends(g
         return FileResponse(path=Path(record.storage_uri))
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve file: {str(e)}")
+    except Exception:
+        logger.exception(f"Failed to retrieve evidence file {evidence_id}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve file.")
 
 
 def fetch_visual_from_microservice(file_path: str, visual_type: str) -> bytes:
@@ -277,18 +297,44 @@ async def _proxy_visual(evidence_id: uuid.UUID, visual_type: str, db: AsyncSessi
 
 
 @router.get("/{evidence_id}/heatmap", tags=["Evidence", "ViT-CORE"])
-async def get_heatmap(evidence_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def get_heatmap(
+    evidence_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserORM = Depends(get_current_user),
+):
     return await _proxy_visual(evidence_id, "heatmap", db)
 
 
 @router.get("/{evidence_id}/patches", tags=["Evidence", "ViT-CORE"])
-async def get_patches(evidence_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def get_patches(
+    evidence_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserORM = Depends(get_current_user),
+):
     return await _proxy_visual(evidence_id, "patches", db)
 
 
 @router.get("/{evidence_id}/attention", tags=["Evidence", "ViT-CORE"])
-async def get_attention(evidence_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def get_attention(
+    evidence_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserORM = Depends(get_current_user),
+):
     return await _proxy_visual(evidence_id, "attention", db)
+
+
+async def _require_evidence_owner(db: AsyncSession, evidence_id: uuid.UUID, current_user: UserORM) -> None:
+    """Mirrors cases.py's _require_case_owner: any analyst can view evidence
+    (shared caseload), but only whoever uploaded it may delete/restore it."""
+    result = await db.execute(
+        text("SELECT uploaded_by FROM core.evidence WHERE id = :id"),
+        {"id": str(evidence_id)},
+    )
+    row = result.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Evidence not found")
+    if row.uploaded_by != current_user.email:
+        raise HTTPException(status_code=403, detail="Only the analyst who uploaded this evidence may perform this action.")
 
 
 @router.delete("/{evidence_id}", tags=["Evidence"])
@@ -302,7 +348,8 @@ async def delete_evidence(
     restore_evidence can undo it within SOFT_DELETE_GRACE_PERIOD. Actual
     purging (row + file) happens in api/worker.py's purge sweep - this used
     to delete the file and row immediately, with no way back from a
-    misclick."""
+    misclick. Only the uploader may delete it (see _require_evidence_owner)."""
+    await _require_evidence_owner(db, evidence_id, current_user)
     try:
         now = datetime.now(timezone.utc)
         result = await db.execute(
@@ -324,10 +371,10 @@ async def delete_evidence(
         return {"status": "success", "message": "Evidence marked for deletion."}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         await db.rollback()
-        logger.error(f"Deletion failed for {evidence_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Delete failed: {str(e)}")
+        logger.exception(f"Deletion failed for evidence {evidence_id}")
+        raise HTTPException(status_code=500, detail="Delete failed.")
 
 
 @router.post("/{evidence_id}/restore", tags=["Evidence"])
@@ -337,7 +384,9 @@ async def restore_evidence(
     current_user: UserORM = Depends(get_current_user),
 ):
     """Undoes delete_evidence within the grace period. Returns 404 once the
-    purge sweep has already physically removed it."""
+    purge sweep has already physically removed it. Only the uploader may
+    restore it (see _require_evidence_owner)."""
+    await _require_evidence_owner(db, evidence_id, current_user)
     try:
         result = await db.execute(
             text("UPDATE core.evidence SET deleted_at = NULL WHERE id = :id AND deleted_at IS NOT NULL RETURNING id"),
@@ -351,6 +400,7 @@ async def restore_evidence(
         return {"status": "success", "message": "Evidence restored."}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Restore failed: {str(e)}")
+        logger.exception(f"Restore failed for evidence {evidence_id}")
+        raise HTTPException(status_code=500, detail="Restore failed.")

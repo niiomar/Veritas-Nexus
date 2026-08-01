@@ -2,12 +2,13 @@ import os
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.dependencies import get_db_session, get_current_user
+from api.rate_limiting import limiter
 from api.services.auth_service import (
     hash_password,
     verify_password,
@@ -54,18 +55,21 @@ def _user_payload(user: UserORM) -> dict:
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
-async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db_session)):
+@limiter.limit("5/hour")
+async def register(request: Request, body: RegisterRequest, db: AsyncSession = Depends(get_db_session)):
     """Self-service signup. Accounts start unverified; login is blocked
-    until the email verification link is used (see /verify)."""
-    existing = (await db.execute(select(UserORM).where(UserORM.email == request.email))).scalar_one_or_none()
+    until the email verification link is used (see /verify). Rate-limited -
+    otherwise unlimited registrations flood the log-only email stub (or a
+    real SMTP provider, once configured) for free."""
+    existing = (await db.execute(select(UserORM).where(UserORM.email == body.email))).scalar_one_or_none()
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="An account with that email already exists.")
 
     now = datetime.now(timezone.utc)
     user = UserORM(
         id=uuid.uuid4(),
-        email=request.email,
-        password_hash=hash_password(request.password),
+        email=body.email,
+        password_hash=hash_password(body.password),
         is_verified=False,
         role="ANALYST",
         created_at=now,
@@ -108,13 +112,16 @@ async def verify_email(token: str, db: AsyncSession = Depends(get_db_session)):
 
 
 @router.post("/login")
-async def login(request: LoginRequest, db: AsyncSession = Depends(get_db_session)):
+@limiter.limit("10/minute")
+async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends(get_db_session)):
     # Deliberately the same generic error for "no such user" and "wrong
     # password" - distinguishing them lets an attacker enumerate accounts.
+    # Rate-limited on top of that, since enumeration-safe responses alone
+    # don't stop an unlimited-rate password brute-force.
     invalid_credentials = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password.")
 
-    user = (await db.execute(select(UserORM).where(UserORM.email == request.email))).scalar_one_or_none()
-    if not user or not verify_password(request.password, user.password_hash):
+    user = (await db.execute(select(UserORM).where(UserORM.email == body.email))).scalar_one_or_none()
+    if not user or not verify_password(body.password, user.password_hash):
         raise invalid_credentials
 
     if not user.is_verified:
@@ -125,10 +132,12 @@ async def login(request: LoginRequest, db: AsyncSession = Depends(get_db_session
 
 
 @router.post("/forgot-password")
-async def forgot_password(request: ForgotPasswordRequest, db: AsyncSession = Depends(get_db_session)):
+@limiter.limit("5/hour")
+async def forgot_password(request: Request, body: ForgotPasswordRequest, db: AsyncSession = Depends(get_db_session)):
     """Always returns the same generic response whether or not the email is
-    registered, so this endpoint can't be used to enumerate accounts."""
-    user = (await db.execute(select(UserORM).where(UserORM.email == request.email))).scalar_one_or_none()
+    registered, so this endpoint can't be used to enumerate accounts.
+    Rate-limited so it can't be used to flood the email stub/provider."""
+    user = (await db.execute(select(UserORM).where(UserORM.email == body.email))).scalar_one_or_none()
     if user:
         reset_token = create_password_reset_token(user.id)
         send_password_reset_email(user.email, f"{FRONTEND_URL}/?reset_token={reset_token}")

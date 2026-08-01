@@ -88,6 +88,9 @@ body { font-family: 'Inter', sans-serif; background-color: var(--bg-base); color
 .step-row.done { color: var(--c-trust); }
 
 .toast { position: fixed; top: 1rem; right: 1rem; background: var(--c-crit); color: white; padding: 1rem; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); z-index: 300; display: flex; align-items: center; gap: 0.5rem; animation: slideIn 0.3s ease-out; }
+.toast-undo { position: fixed; top: 1rem; right: 1rem; background: #0a0a0c; border: 1px solid rgba(255,255,255,0.15); color: var(--text-main); padding: 0.75rem 1rem; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); z-index: 300; display: flex; align-items: center; gap: 1rem; animation: slideIn 0.3s ease-out; font-size: 0.8rem; }
+.toast-undo button { background: transparent; border: 1px solid var(--c-trust); color: var(--c-trust); border-radius: 4px; padding: 0.35rem 0.75rem; cursor: pointer; font-weight: 600; letter-spacing: 0.05em; font-size: 0.75rem; }
+.toast-undo button:hover { background: rgba(52, 211, 153, 0.1); }
 @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
 
 .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }

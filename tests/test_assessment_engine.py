@@ -89,6 +89,13 @@ class TestMetadataIntegrityDomain:
         result = evaluate_assessment(make_ai_report(), exif=None)
         assert result["domains"][2]["score"] == 0
 
+    def test_failed_extraction_scores_zero_not_present(self):
+        """A failed extraction (exif_core.py returns {"status": "FAILED"})
+        must score like no metadata at all, not like metadata is present."""
+        exif = {"status": "FAILED", "error": "exiftool not found", "anomalies": {"likely_stripped": False}}
+        result = evaluate_assessment(make_ai_report(), exif)
+        assert result["domains"][2]["score"] == 0
+
 
 class TestStructuralConsistencyDomain:
     def test_clean_structural_signals_score_full_15(self):

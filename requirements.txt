@@ -15,11 +15,11 @@ psycopg2-binary==2.9.12
 
 Pillow==12.3.0
 imagehash==4.3.2
-# Deliberately held on the 4.x line rather than the new 5.x major: nothing in
-# this repo's test suite exercises the OpenCV-dependent ELA/visual-forensics
-# path (api/services/exif_core.py), so there's no automated way to catch a
-# breaking API change from a major-version jump. Revisit once that path has
-# coverage.
+# Deliberately held on the 4.x line rather than the new 5.x major - a jump
+# straight to 5.x is a bigger, riskier change than this pass is scoped for.
+# tests/test_exif_core.py now covers the OpenCV-dependent ELA/visual-
+# forensics path (api/services/exif_core.py), so a future bump can be
+# verified automatically instead of by hand.
 opencv-python-headless==4.14.0.94
 numpy==2.4.6
 
@@ -27,6 +27,7 @@ numpy==2.4.6
 bcrypt==5.0.0
 pyjwt==2.13.0
 email-validator==2.3.0
+slowapi==0.1.10
 
 # Utilities
 python-dotenv==1.2.2
