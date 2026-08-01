@@ -12,6 +12,7 @@ Requires Docker to be running locally / in CI.
 import os
 import subprocess
 import sys
+import tempfile
 import uuid
 
 import pytest
@@ -21,6 +22,11 @@ import pytest_asyncio
 # imported (they read it at module level) - hence set here, at collection
 # time, rather than inside a fixture.
 os.environ.setdefault("JWT_SECRET", "test-jwt-secret-do-not-use-in-prod")
+
+# api.routers.evidence also reads its storage path at module level. Point it
+# at a throwaway temp dir instead of the production default (a docker-volume
+# mount point that doesn't exist on a bare CI runner).
+os.environ.setdefault("EVIDENCE_VAULT_PATH", tempfile.mkdtemp(prefix="veritas-nexus-test-vault-"))
 
 TEST_PASSWORD = "TestPassword123!"
 

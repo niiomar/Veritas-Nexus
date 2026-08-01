@@ -28,7 +28,11 @@ load_dotenv()
 logger = logging.getLogger("EvidenceRouter")
 
 router = APIRouter(prefix="/api/v1/evidence", tags=["Evidence"])
-STORAGE_VAULT = Path("/vault")
+# Must match the docker-compose "nexus_storage" volume's mount point
+# (/app/storage_vault) - a bare "/vault" silently wrote into the container's
+# ephemeral layer instead of the persisted volume, and required root to
+# mkdir at the filesystem root (which broke on non-root CI runners).
+STORAGE_VAULT = Path(os.getenv("EVIDENCE_VAULT_PATH", "/app/storage_vault"))
 
 # Read microservice credentials
 VIT_CORE_URL = os.getenv("VIT_CORE_URL", "http://host.docker.internal:8001/api/v1/analyze")
