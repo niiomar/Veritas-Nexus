@@ -152,6 +152,30 @@ async def test_delete_case_removes_it_from_the_list(api_client, auth_headers):
 
 
 @pytest.mark.asyncio
+async def test_deleted_only_lists_soft_deleted_cases_with_purge_at(api_client, auth_headers):
+    """Backs the frontend's "Recently Deleted" recovery view - deleted_only
+    is the mirror image of the default listing, and must expose enough to
+    show a countdown to the actual purge."""
+    create = await api_client.post(
+        "/api/v1/cases",
+        json={"title": "Recoverable Case", "priority": "LOW", "analyst": "Analyst_04"},
+        headers=auth_headers,
+    )
+    case_id = create.json()["case_id"]
+    await api_client.delete(f"/api/v1/cases/{case_id}", headers=auth_headers)
+
+    active_listing = await api_client.get("/api/v1/cases", headers=auth_headers)
+    assert case_id not in [c["id"] for c in active_listing.json()["cases"]]
+
+    deleted_listing = await api_client.get("/api/v1/cases", params={"deleted_only": True}, headers=auth_headers)
+    assert deleted_listing.status_code == 200
+    matches = [c for c in deleted_listing.json()["cases"] if c["id"] == case_id]
+    assert len(matches) == 1
+    assert matches[0]["deleted_at"] is not None
+    assert matches[0]["purge_at"] > matches[0]["deleted_at"], "purge_at must be after deleted_at (the grace period)"
+
+
+@pytest.mark.asyncio
 async def test_delete_nonexistent_case_returns_404(api_client, auth_headers):
     response = await api_client.delete(
         "/api/v1/cases/00000000-0000-0000-0000-000000000000", headers=auth_headers

@@ -32,3 +32,4 @@ slowapi==0.1.10
 # Utilities
 python-dotenv==1.2.2
 requests==2.34.2
+reportlab==5.0.0

@@ -10,8 +10,11 @@ export interface Case {
   alias: string;
   analyst: string;
   priority: ThreatPriority;
+  created_by?: string;
   created: string;
   count: number;
+  deleted_at?: string;
+  purge_at?: string;
 }
 
 export type ProvenanceStatus = "VALID" | "INVALID" | "UNSIGNED" | "PARTIAL";
@@ -52,10 +55,12 @@ export interface Evidence {
   status: EvidenceStatus;
   storage_uri: string;
   uploaded_by: string;
-  uploaded_at: string; 
-  created_at?: string; 
-  upload_date?: string; 
+  uploaded_at: string;
+  created_at?: string;
+  upload_date?: string;
   ai_report: AIReport | null;
+  deleted_at?: string;
+  purge_at?: string;
 }
 
 export type AssessmentType = "trust" | "review" | "crit" | "neutral";

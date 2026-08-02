@@ -34,7 +34,7 @@ export const IngestionPipeline: React.FC<{
         await sleep(500);
         if (!isMounted) return;
         
-        await EvidenceAPI.uploadPayload(file, activeCase.id, activeCase.analyst, useVit, useC2pa);
+        await EvidenceAPI.uploadPayload(file, activeCase.id, useVit, useC2pa);
         
         advance(5);
         await sleep(800);

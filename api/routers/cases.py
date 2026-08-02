@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
+from api.constants import SOFT_DELETE_GRACE_PERIOD
 from api.dependencies import get_db_session, get_current_user
 from infrastructure.persistence.models import UserORM
 
@@ -82,19 +83,23 @@ async def create_case(
 async def list_cases(
     db: AsyncSession = Depends(get_db_session),
     current_user: UserORM = Depends(get_current_user),
+    deleted_only: bool = False,
 ):
     """Lists all cases visible to any authenticated analyst (shared team
     caseload - see get_case/update_case/delete_case for the ownership check
     that gates mutations). Cases are server-authoritative - the frontend
     used to cache them in localStorage only, which meant they vanished on a
     cleared browser or a second device. Soft-deleted cases (see delete_case)
-    are excluded until restored."""
+    are excluded by default; pass deleted_only=true to list them instead,
+    for a "recently deleted" recovery view."""
     try:
-        stmt = text("""
-            SELECT id, title, alias, analyst, priority, created_by, created_at
+        deleted_clause = "deleted_at IS NOT NULL" if deleted_only else "deleted_at IS NULL"
+        order_clause = "deleted_at DESC" if deleted_only else "created_at DESC"
+        stmt = text(f"""
+            SELECT id, title, alias, analyst, priority, created_by, created_at, deleted_at
             FROM core.cases
-            WHERE deleted_at IS NULL
-            ORDER BY created_at DESC
+            WHERE {deleted_clause}
+            ORDER BY {order_clause}
         """)
         result = await db.execute(stmt)
         rows = result.mappings().all()
@@ -109,6 +114,14 @@ async def list_cases(
                     "priority": row["priority"],
                     "created_by": row["created_by"],
                     "created": row["created_at"].date().isoformat(),
+                    **(
+                        {
+                            "deleted_at": row["deleted_at"].isoformat(),
+                            "purge_at": (row["deleted_at"] + SOFT_DELETE_GRACE_PERIOD).isoformat(),
+                        }
+                        if deleted_only
+                        else {}
+                    ),
                 }
                 for row in rows
             ]

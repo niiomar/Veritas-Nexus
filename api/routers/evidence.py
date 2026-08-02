@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from fastapi.responses import FileResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.constants import SOFT_DELETE_GRACE_PERIOD
 from api.dependencies import get_db_session as get_db, get_current_user
 from infrastructure.persistence.models import EvidenceORM, AnalysisJobORM, AuditEventORM, UserORM
 
@@ -148,6 +149,7 @@ async def list_evidence(
     case_id: uuid.UUID | None = None,
     limit: int = 500,
     offset: int = 0,
+    deleted_only: bool = False,
 ):
     """Lists evidence, newest first. Unbounded before this - fine at demo
     scale, but nothing stopped a single query from pulling back the entire
@@ -155,27 +157,30 @@ async def list_evidence(
     scope to one case's evidence without pulling the whole library (the
     frontend still fetches everything today, since Sidebar's per-case stat
     counts need visibility across all cases at once - narrowing that is a
-    frontend data-flow change of its own, not a query-shape one)."""
+    frontend data-flow change of its own, not a query-shape one). Pass
+    deleted_only=true to list soft-deleted evidence instead, for a
+    "recently deleted" recovery view."""
     limit = max(1, min(limit, 2000))
     offset = max(0, offset)
     try:
-        where_clauses = ["e.deleted_at IS NULL"]
+        where_clauses = ["e.deleted_at IS NOT NULL" if deleted_only else "e.deleted_at IS NULL"]
         params: dict = {"limit": limit, "offset": offset}
         if case_id is not None:
             where_clauses.append("e.case_id = :case_id")
             params["case_id"] = str(case_id)
         where_sql = " AND ".join(where_clauses)
+        order_sql = "e.deleted_at DESC" if deleted_only else "e.uploaded_at DESC"
 
         total = (await db.execute(
             text(f"SELECT COUNT(*) FROM core.evidence e WHERE {where_sql}"), params
         )).scalar_one()
 
         stmt = text(f"""
-            SELECT e.id, e.case_id, e.original_filename, e.sha256, e.uploaded_at, e.metadata_dict, j.status, j.ai_report
+            SELECT e.id, e.case_id, e.original_filename, e.sha256, e.uploaded_by, e.uploaded_at, e.deleted_at, e.metadata_dict, j.status, j.ai_report
             FROM core.evidence e
             JOIN analysis.analysis_jobs j ON e.id = j.evidence_id
             WHERE {where_sql}
-            ORDER BY e.uploaded_at DESC
+            ORDER BY {order_sql}
             LIMIT :limit OFFSET :offset
         """)
         result = await db.execute(stmt, params)
@@ -193,10 +198,19 @@ async def list_evidence(
                 "case_id": str(row["case_id"]),
                 "filename": row["original_filename"],
                 "sha256": row["sha256"],
+                "uploaded_by": row["uploaded_by"],
                 "status": row["status"],
                 "uploaded_at": row["uploaded_at"].isoformat(),
                 "ai_report": report,
-                "metadata_dict": row.get("metadata_dict", {}) # Append EXIF to payload
+                "metadata_dict": row.get("metadata_dict", {}), # Append EXIF to payload
+                **(
+                    {
+                        "deleted_at": row["deleted_at"].isoformat(),
+                        "purge_at": (row["deleted_at"] + SOFT_DELETE_GRACE_PERIOD).isoformat(),
+                    }
+                    if deleted_only
+                    else {}
+                ),
             })
 
         return {"evidence": evidence_list, "total": total, "limit": limit, "offset": offset}

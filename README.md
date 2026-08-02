@@ -7,6 +7,7 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.141-009688?logo=fastapi&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-4169E1?logo=postgresql&logoColor=white)
+![License](https://img.shields.io/badge/license-proprietary-lightgrey)
 
 ---
 
@@ -46,9 +47,10 @@ The forensic engines themselves (**ViT-CORE-FORENSICS** for deepfake detection, 
 
 **Case & evidence management**
 - Shared team visibility (any analyst can view any case) with creator-only edit/delete/restore rights
-- Soft-delete with a recoverable grace period, a background purge sweep, and an "Undo" affordance in the UI
+- Soft-delete with a recoverable grace period, a background purge sweep, an "Undo" toast right after deleting, and a "Recently Deleted" view to recover anything within the full grace period
 - Offset/limit pagination and per-case filtering on the evidence ledger
 - A full audit trail (`core.audit_events`) for every state-changing action
+- One-click PDF report generation: an immutable, timestamped snapshot of a piece of evidence's case details, provenance, and full trust-score breakdown
 
 **Platform**
 - Real per-user auth: bcrypt password hashing, JWT access tokens, email verification and password reset flows
@@ -90,7 +92,7 @@ flowchart LR
 ```
 
 - **API layer** (`api/`) — FastAPI routers for auth, cases, evidence, assessments, and reports. Stateless request handling; all mutation goes through SQLAlchemy's async engine.
-- **Persistence** (`infrastructure/persistence/`) — SQLAlchemy ORM models and the async engine/session factory. Two Postgres schemas: `core` (users, cases, evidence, audit events) and `analysis` (analysis jobs).
+- **Persistence** (`infrastructure/persistence/`) — SQLAlchemy ORM models and the async engine/session factory. Two Postgres schemas: `core` (users, cases, evidence, reports, audit events) and `analysis` (analysis jobs).
 - **Background worker** (`api/worker.py`) — a single asyncio poll loop, run as a lifespan task alongside the API process. Picks up `PENDING` analysis jobs, calls out to the forensic engines, writes the weighted assessment, and runs a periodic soft-delete purge sweep.
 - **Migrations** (`alembic/`) — every schema change is a tracked migration; nothing is applied to a database by hand.
 - **Frontend** (`frontend/`) — a Vite + React + TypeScript single-page analyst workstation: case list, ingestion pipeline, decision workspace, and auth screens.
@@ -128,6 +130,7 @@ Unsupported formats or media rejected by the AI engine short-circuit straight to
 | Persistence | PostgreSQL 15, SQLAlchemy 2.0 (async), Alembic |
 | Auth | bcrypt, PyJWT, slowapi (rate limiting) |
 | Forensics | Pillow, OpenCV (headless), imagehash, exiftool |
+| Reporting | ReportLab (PDF generation) |
 | Frontend | React 19, TypeScript, Vite, lucide-react |
 | Testing | pytest, pytest-asyncio, testcontainers, httpx, Vitest, React Testing Library |
 | Infra | Docker Compose, GitHub Actions |
@@ -142,16 +145,16 @@ api/
 ├── constants.py           # Soft-delete grace period, etc.
 ├── rate_limiting.py       # Shared slowapi Limiter instance
 ├── routers/               # auth, cases, evidence, assessments, reports
-└── services/               # auth_service, email_service, exif_core, assessment_engine
+└── services/               # auth_service, email_service, exif_core, assessment_engine, report_service
 
 infrastructure/persistence/
-├── models.py              # SQLAlchemy ORM models (User, Case, Evidence, AnalysisJob, AuditEvent)
+├── models.py              # SQLAlchemy ORM models (User, Case, Evidence, AnalysisJob, Report, AuditEvent)
 └── database.py            # Async engine + session factory
 
 alembic/                   # Tracked schema migrations (source of truth for the DB schema)
 tests/                     # pytest integration + unit suite (real Postgres via testcontainers)
 frontend/src/
-├── components/            # AuthScreen, Sidebar, DecisionWorkspace, ingestion/case modals
+├── components/            # AuthScreen, Sidebar, DecisionWorkspace, RecentlyDeletedModal, ingestion/case modals
 ├── services/               # api.ts, auth.ts, assessment.ts
 └── App.tsx
 ```
@@ -262,7 +265,7 @@ The full interactive OpenAPI documentation is served at `http://localhost:8000/d
 | `/api/v1/cases` | Create, list, get, update, soft-delete, restore |
 | `/api/v1/evidence` | Ingest, list (paginated), download, heatmap/patches/attention, soft-delete, restore |
 | `/api/v1/assessments` | Fetch the computed trust assessment for a piece of evidence |
-| `/api/v1/reports` | Report generation (currently a placeholder — see [Roadmap](#known-limitations--roadmap)) |
+| `/api/v1/reports` | Generate and download a PDF authenticity-report snapshot for a piece of evidence |
 | `/api/v1/health` | Liveness + downstream-engine reachability |
 
 ## Security Model
@@ -284,7 +287,7 @@ GitHub Actions (`.github/workflows/ci.yml`) runs on every push and pull request 
 
 ## Known Limitations & Roadmap
 
-- `POST /api/v1/reports/{assessment_id}` is a placeholder — real (e.g. PDF) report generation is a planned feature, not yet implemented.
+- Report generation isn't wired into the frontend yet — trigger it via the API (`/docs`) or a REST client until a UI button is added.
 - The frontend lint step is intentionally non-blocking in CI while a backlog of pre-existing `no-explicit-any` and strict React Compiler rule violations is worked down.
 - `opencv-python-headless` is deliberately held on the 4.x line pending verification of the 5.x major.
 - Authorization is a flat "any analyst can view, creator can edit" model; role-based access (e.g. admin override, per-case assignment) is a natural next step if the team grows.
@@ -298,4 +301,4 @@ GitHub Actions (`.github/workflows/ci.yml`) runs on every push and pull request 
 
 ## License
 
-No license has been established for this repository yet. Until one is added, all rights are reserved by the project owner.
+Proprietary — All rights reserved. See [LICENSE](LICENSE).

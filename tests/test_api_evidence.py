@@ -104,6 +104,27 @@ async def test_delete_evidence_removes_it_from_the_list(api_client, auth_headers
 
 
 @pytest.mark.asyncio
+async def test_deleted_only_lists_soft_deleted_evidence_with_purge_at(api_client, auth_headers, registered_user):
+    """Backs the frontend's "Recently Deleted" recovery view - deleted_only
+    is the mirror image of the default listing, and must expose enough
+    (uploaded_by, deleted_at, purge_at) to gate/label restore actions."""
+    case_id = await _create_case(api_client, auth_headers)
+    evidence_id = await _upload_evidence(api_client, auth_headers, case_id)
+    await api_client.delete(f"/api/v1/evidence/{evidence_id}", headers=auth_headers)
+
+    active_listing = await api_client.get("/api/v1/evidence/", headers=auth_headers)
+    assert evidence_id not in [e["id"] for e in active_listing.json()["evidence"]]
+
+    deleted_listing = await api_client.get("/api/v1/evidence/", params={"deleted_only": True}, headers=auth_headers)
+    assert deleted_listing.status_code == 200
+    matches = [e for e in deleted_listing.json()["evidence"] if e["id"] == evidence_id]
+    assert len(matches) == 1
+    assert matches[0]["deleted_at"] is not None
+    assert matches[0]["purge_at"] > matches[0]["deleted_at"]
+    assert matches[0]["uploaded_by"] == registered_user["email"]
+
+
+@pytest.mark.asyncio
 async def test_deleting_a_case_cascades_to_its_evidence(api_client, auth_headers):
     """Regression test: this endpoint used to only clear the frontend's
     localStorage cache and never actually delete anything server-side."""

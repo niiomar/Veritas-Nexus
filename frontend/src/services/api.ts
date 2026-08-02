@@ -24,15 +24,29 @@ const parseFastAPIError = (errorData: any, defaultMessage: string) => {
 
 export const EvidenceAPI = {
   fetchCases: async () => {
-    const response = await fetch(`${API_BASE_URL}/api/v1/cases`);
+    const response = await fetch(`${API_BASE_URL}/api/v1/cases`, { headers: authHeaders() });
     if (!response.ok) throw new Error('Failed to fetch case list');
     const data = await response.json();
     return Array.isArray(data) ? data : (data.cases || []);
   },
 
   fetchLibrary: async () => {
-    const response = await fetch(`${API_BASE_URL}/api/v1/evidence/`);
+    const response = await fetch(`${API_BASE_URL}/api/v1/evidence/`, { headers: authHeaders() });
     if (!response.ok) throw new Error('Failed to fetch evidence library');
+    const data = await response.json();
+    return Array.isArray(data) ? data : (data.evidence || []);
+  },
+
+  fetchDeletedCases: async () => {
+    const response = await fetch(`${API_BASE_URL}/api/v1/cases?deleted_only=true`, { headers: authHeaders() });
+    if (!response.ok) throw new Error('Failed to fetch recently deleted cases');
+    const data = await response.json();
+    return Array.isArray(data) ? data : (data.cases || []);
+  },
+
+  fetchDeletedEvidence: async () => {
+    const response = await fetch(`${API_BASE_URL}/api/v1/evidence/?deleted_only=true`, { headers: authHeaders() });
+    if (!response.ok) throw new Error('Failed to fetch recently deleted evidence');
     const data = await response.json();
     return Array.isArray(data) ? data : (data.evidence || []);
   },
@@ -98,11 +112,10 @@ export const EvidenceAPI = {
     return true;
   },
 
-  uploadPayload: async (file: File, caseId: string, uploadedBy: string = "Analyst_01", useVit: boolean = true, useC2pa: boolean = true) => {
+  uploadPayload: async (file: File, caseId: string, useVit: boolean = true, useC2pa: boolean = true) => {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("case_id", caseId);
-    formData.append("uploaded_by", uploadedBy);
 
     // FASTAPI requires these as strings in the form data
     formData.append("use_vit", String(useVit));
