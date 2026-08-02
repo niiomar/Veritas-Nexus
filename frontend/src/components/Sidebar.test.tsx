@@ -34,7 +34,6 @@ const makeEvidence = (id: string, verdict: string): Evidence => ({
     platform_status: 'VERIFIED',
     disposition: 'Trusted',
     threat_summary: null,
-    // @ts-expect-error - assessment isn't in the AIReport type; the server attaches it dynamically
     assessment: {
       verdict,
       conf: '80.0',

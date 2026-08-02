@@ -1,7 +1,8 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
-import { Disc, Edit2, Lock, ShieldCheck, Circle, Check, Copy, Link as LinkIcon, AlertTriangle, ChevronDown, ChevronRight, Maximize, ZoomIn, ZoomOut, Info, Camera, Clock, FileMinus, Target } from 'lucide-react';
+import { Disc, Edit2, Lock, ShieldCheck, Circle, Check, Copy, Link as LinkIcon, AlertTriangle, ChevronDown, ChevronRight, Maximize, ZoomIn, ZoomOut, Info, Camera, Clock, FileMinus, Target, FileText, Loader2 } from 'lucide-react';
 import type { Evidence } from '../types';
 import { AssessmentEngine } from '../services/assessment';
+import { EvidenceAPI } from '../services/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -196,6 +197,32 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
   const [viewSession] = useState(Date.now());
   const [imageTokens, setImageTokens] = useState<Record<string, number>>({});
 
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
+
+  const handleGenerateReport = useCallback(async () => {
+    if (!evidence?.id) return;
+    setIsGeneratingReport(true);
+    setReportError(null);
+    try {
+      const { report_id } = await EvidenceAPI.generateReport(evidence.id);
+      const blob = await EvidenceAPI.downloadReport(report_id);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `veritas-nexus-report-${report_id}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setReportError(err instanceof Error ? err.message : 'Failed to generate report.');
+      setTimeout(() => setReportError(null), 5000);
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  }, [evidence]);
+
   useEffect(() => {
     setZoom(1);
   }, [evidence?.id, imageTab]);
@@ -242,7 +269,23 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
       {/* GLOBAL HEADER*/}
       <div style={{ flexShrink: 0, padding: '12px 48px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div className="mono" style={{ fontSize: '10px', letterSpacing: '0.15em', fontWeight: 500, color: 'var(--text-faint)' }}>VERITAS NEXUS / DOSSIER</div>
-        <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '10px', letterSpacing: '0.1em' }} className="mono hover-bright">CLOSE ✕</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+          {reportError && (
+            <span className="mono" style={{ fontSize: '10px', color: 'var(--c-crit)' }}>{reportError}</span>
+          )}
+          {!isEval && finalVerdict !== 'REJECTED' && !!evidence?.ai_report?.assessment && (
+            <button
+              onClick={handleGenerateReport}
+              disabled={isGeneratingReport}
+              className="mono hover-bright"
+              style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '4px', padding: '6px 12px', color: 'var(--text-muted)', cursor: isGeneratingReport ? 'default' : 'pointer', fontSize: '10px', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '6px', opacity: isGeneratingReport ? 0.6 : 1 }}
+            >
+              {isGeneratingReport ? <Loader2 size={12} className="animate-spin" /> : <FileText size={12} />}
+              {isGeneratingReport ? 'GENERATING...' : 'GENERATE REPORT'}
+            </button>
+          )}
+          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '10px', letterSpacing: '0.1em' }} className="mono hover-bright">CLOSE ✕</button>
+        </div>
       </div>
 
       {isEval ? (

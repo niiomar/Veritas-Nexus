@@ -87,6 +87,63 @@ async def test_purge_removes_evidence_row_and_file_past_the_grace_period(api_cli
 
 
 @pytest.mark.asyncio
+async def test_purge_removes_reports_generated_from_the_purged_evidence(api_client, auth_headers, db_session):
+    """Regression test: core.reports.evidence_id has a foreign-key to
+    core.evidence.id with no cascade. Purging evidence that still has a
+    generated report attached used to raise a ForeignKeyViolation, which
+    (since the whole sweep runs in one transaction) rolled back the entire
+    purge cycle - including physical files already removed earlier in the
+    same loop - and would repeat every cycle indefinitely."""
+    import json
+
+    from api.worker import purge_expired_soft_deletes
+
+    case_id, evidence_id = await _create_case_with_evidence(api_client, auth_headers, "Reported Evidence Case")
+
+    fake_ai_report = {
+        "disposition": "TEST",
+        "assessment": {
+            "verdict": "VERIFIED", "conf": "90.0", "type": "trust", "msg": "Test",
+            "policy": "Weighted_XAI_v4.7", "domains": [], "totalScore": 90,
+        },
+    }
+    await db_session.execute(
+        text("UPDATE analysis.analysis_jobs SET status = 'COMPLETED', ai_report = :report WHERE evidence_id = :id"),
+        {"report": json.dumps(fake_ai_report), "id": evidence_id},
+    )
+    await db_session.commit()
+
+    generate = await api_client.post(f"/api/v1/reports/{evidence_id}", headers=auth_headers)
+    assert generate.status_code == 201, generate.text
+    report_id = generate.json()["report_id"]
+
+    report_row = (await db_session.execute(
+        text("SELECT storage_uri FROM core.reports WHERE id = :id"), {"id": report_id}
+    )).fetchone()
+    report_file = Path(report_row.storage_uri)
+    assert report_file.exists()
+
+    await api_client.delete(f"/api/v1/evidence/{evidence_id}", headers=auth_headers)
+    long_ago = datetime.now(timezone.utc) - timedelta(hours=48)
+    await db_session.execute(
+        text("UPDATE core.evidence SET deleted_at = :ts WHERE id = :id"), {"ts": long_ago, "id": evidence_id}
+    )
+    await db_session.commit()
+
+    await purge_expired_soft_deletes(db_session)  # must not raise
+
+    remaining_evidence = (await db_session.execute(
+        text("SELECT id FROM core.evidence WHERE id = :id"), {"id": evidence_id}
+    )).fetchone()
+    remaining_report = (await db_session.execute(
+        text("SELECT id FROM core.reports WHERE id = :id"), {"id": report_id}
+    )).fetchone()
+    assert remaining_evidence is None
+    assert remaining_report is None
+    assert not report_file.exists(), "the report PDF should be removed from the storage vault too"
+
+
+@pytest.mark.asyncio
 async def test_purge_removes_expired_case_and_its_evidence(api_client, auth_headers, db_session):
     from api.worker import purge_expired_soft_deletes
 

@@ -43,6 +43,10 @@ export interface AIReport {
   platform_status: string;
   disposition: string;
   threat_summary: string | null;
+  // Present on anything scored since server-side scoring was introduced;
+  // absent on older records - api/routers/reports.py 409s without it, so
+  // the frontend checks for it before offering to generate a report.
+  assessment?: unknown;
 }
 
 export type EvidenceStatus = "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";

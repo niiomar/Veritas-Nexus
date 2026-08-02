@@ -46,7 +46,6 @@ describe('AssessmentEngine.evaluate', () => {
         platform_status: 'CRITICAL THREAT',
         disposition: 'Quarantine',
         threat_summary: null,
-        // @ts-expect-error - assessment isn't in the AIReport type; the server attaches it dynamically
         assessment: storedAssessment,
       },
     });

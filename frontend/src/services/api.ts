@@ -146,5 +146,22 @@ export const EvidenceAPI = {
     });
     if (!response.ok) throw new Error(parseFastAPIError(await response.json().catch(()=>null), 'Failed to restore evidence'));
     return true;
-  }
+  },
+
+  generateReport: async (evidenceId: string): Promise<{ report_id: string }> => {
+    const response = await fetch(`${API_BASE_URL}/api/v1/reports/${evidenceId}`, {
+      method: 'POST',
+      headers: authHeaders(),
+    });
+    if (!response.ok) throw new Error(parseFastAPIError(await response.json().catch(()=>null), 'Failed to generate report'));
+    return response.json();
+  },
+
+  downloadReport: async (reportId: string): Promise<Blob> => {
+    const response = await fetch(`${API_BASE_URL}/api/v1/reports/${reportId}/download`, {
+      headers: authHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to download report');
+    return response.blob();
+  },
 };

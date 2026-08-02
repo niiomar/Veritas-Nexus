@@ -273,6 +273,17 @@ def _remove_physical_file(storage_uri: str) -> None:
 
 
 async def _purge_evidence(session, evidence_id) -> None:
+    # core.reports.evidence_id has a foreign key to core.evidence.id with no
+    # cascade - deleting evidence with a generated report still attached
+    # would otherwise fail with a ForeignKeyViolation, rolling back the
+    # whole sweep (including physical files already removed earlier in the
+    # same loop) and repeating the failure every cycle indefinitely.
+    report_rows = (await session.execute(
+        text("SELECT storage_uri FROM core.reports WHERE evidence_id = :id"), {"id": str(evidence_id)}
+    )).fetchall()
+    for report_row in report_rows:
+        _remove_physical_file(report_row.storage_uri)
+    await session.execute(text("DELETE FROM core.reports WHERE evidence_id = :id"), {"id": str(evidence_id)})
     await session.execute(text("DELETE FROM analysis.analysis_jobs WHERE evidence_id = :id"), {"id": str(evidence_id)})
     await session.execute(text("DELETE FROM core.evidence WHERE id = :id"), {"id": str(evidence_id)})
 
@@ -281,7 +292,10 @@ async def purge_expired_soft_deletes(session) -> None:
     """Physically deletes (row + storage vault file) anything soft-deleted
     past SOFT_DELETE_GRACE_PERIOD. api/routers/cases.py and
     api/routers/evidence.py's DELETE endpoints only ever set deleted_at -
-    this is the only place a delete becomes actually irreversible."""
+    this is the only place a delete becomes actually irreversible. Any PDF
+    reports generated from purged evidence are purged with it (see
+    _purge_evidence) - there's no route back to evidence that no longer
+    exists, so keeping the report around would just be a dangling file."""
     cutoff = datetime.now(timezone.utc) - SOFT_DELETE_GRACE_PERIOD
 
     expired_evidence = (await session.execute(
