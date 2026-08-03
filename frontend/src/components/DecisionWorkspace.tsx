@@ -199,6 +199,27 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
 
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
+  const [previousReports, setPreviousReports] = useState<{ report_id: string; generated_by: string; generated_at: string }[]>([]);
+  const [isReportsMenuOpen, setIsReportsMenuOpen] = useState(false);
+  const [downloadingReportId, setDownloadingReportId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPreviousReports([]);
+    setIsReportsMenuOpen(false);
+    if (!evidence?.id) return;
+    EvidenceAPI.listReports(evidence.id).then(setPreviousReports).catch(() => {});
+  }, [evidence?.id]);
+
+  const downloadBlobAs = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
 
   const handleGenerateReport = useCallback(async () => {
     if (!evidence?.id) return;
@@ -207,14 +228,8 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
     try {
       const { report_id } = await EvidenceAPI.generateReport(evidence.id);
       const blob = await EvidenceAPI.downloadReport(report_id);
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `veritas-nexus-report-${report_id}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
+      downloadBlobAs(blob, `veritas-nexus-report-${report_id}.pdf`);
+      EvidenceAPI.listReports(evidence.id).then(setPreviousReports).catch(() => {});
     } catch (err) {
       setReportError(err instanceof Error ? err.message : 'Failed to generate report.');
       setTimeout(() => setReportError(null), 5000);
@@ -222,6 +237,19 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
       setIsGeneratingReport(false);
     }
   }, [evidence]);
+
+  const handleDownloadPastReport = async (reportId: string) => {
+    setDownloadingReportId(reportId);
+    try {
+      const blob = await EvidenceAPI.downloadReport(reportId);
+      downloadBlobAs(blob, `veritas-nexus-report-${reportId}.pdf`);
+    } catch (err) {
+      setReportError(err instanceof Error ? err.message : 'Failed to download report.');
+      setTimeout(() => setReportError(null), 5000);
+    } finally {
+      setDownloadingReportId(null);
+    }
+  };
 
   useEffect(() => {
     setZoom(1);
@@ -273,6 +301,40 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
           {reportError && (
             <span className="mono" style={{ fontSize: '10px', color: 'var(--c-crit)' }}>{reportError}</span>
           )}
+
+          {previousReports.length > 0 && (
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setIsReportsMenuOpen(v => !v)}
+                className="mono hover-bright"
+                style={{ background: isReportsMenuOpen ? 'rgba(255,255,255,0.05)' : 'transparent', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '4px', padding: '6px 12px', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '10px', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                {isReportsMenuOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                {previousReports.length} PRIOR REPORT{previousReports.length > 1 ? 'S' : ''}
+              </button>
+              {isReportsMenuOpen && (
+                <div className="animate-fade-in" style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, width: '320px', backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', boxShadow: '0 8px 24px rgba(0,0,0,0.5)', zIndex: 20, overflow: 'hidden' }}>
+                  {previousReports.map((r) => (
+                    <div key={r.report_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)', gap: '12px' }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div className="mono" style={{ fontSize: '10px', color: 'var(--text-main)' }}>{new Date(r.generated_at).toLocaleString()}</div>
+                        <div className="mono truncate" style={{ fontSize: '9px', color: 'var(--text-faint)' }}>{r.generated_by}</div>
+                      </div>
+                      <button
+                        onClick={() => handleDownloadPastReport(r.report_id)}
+                        disabled={downloadingReportId === r.report_id}
+                        className="mono hover-bright"
+                        style={{ flexShrink: 0, background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '4px', padding: '4px 8px', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '9px' }}
+                      >
+                        {downloadingReportId === r.report_id ? '...' : 'DOWNLOAD'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {!isEval && finalVerdict !== 'REJECTED' && !!evidence?.ai_report?.assessment && (
             <button
               onClick={handleGenerateReport}

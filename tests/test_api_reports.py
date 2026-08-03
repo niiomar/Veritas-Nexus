@@ -137,3 +137,76 @@ async def test_download_nonexistent_report_returns_404(api_client, auth_headers)
         "/api/v1/reports/00000000-0000-0000-0000-000000000000/download", headers=auth_headers
     )
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_generate_report_writes_an_audit_event(api_client, auth_headers, registered_user, db_session):
+    """Every other state-changing action (case create/delete, evidence
+    ingest/delete) writes to core.audit_events - report generation is a
+    chain-of-custody feature, so leaving it unaudited would be ironic."""
+    from sqlalchemy import text
+
+    evidence_id = await _create_case_with_evidence(api_client, auth_headers)
+    await _complete_analysis(db_session, evidence_id)
+
+    generate = await api_client.post(f"/api/v1/reports/{evidence_id}", headers=auth_headers)
+    assert generate.status_code == 201, generate.text
+
+    row = (await db_session.execute(
+        text("SELECT performed_by FROM core.audit_events WHERE resource_id = :id AND action = 'REPORT_GENERATED'"),
+        {"id": evidence_id},
+    )).fetchone()
+    assert row is not None
+    assert row.performed_by == registered_user["email"]
+
+
+@pytest.mark.asyncio
+async def test_list_reports_requires_authentication(api_client, auth_headers):
+    evidence_id = await _create_case_with_evidence(api_client, auth_headers)
+
+    response = await api_client.get(f"/api/v1/reports/{evidence_id}")
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_list_reports_is_empty_before_any_are_generated(api_client, auth_headers):
+    evidence_id = await _create_case_with_evidence(api_client, auth_headers)
+
+    response = await api_client.get(f"/api/v1/reports/{evidence_id}", headers=auth_headers)
+    assert response.status_code == 200
+    assert response.json() == {"reports": []}
+
+
+@pytest.mark.asyncio
+async def test_list_reports_finds_previously_generated_reports_newest_first(api_client, auth_headers, registered_user, db_session):
+    """This is the whole point of the endpoint: report_id only ever
+    surfaces once, in generate_court_report's response - without a way to
+    list them back, a dismissed download was effectively unrecoverable."""
+    evidence_id = await _create_case_with_evidence(api_client, auth_headers)
+    await _complete_analysis(db_session, evidence_id)
+
+    first = await api_client.post(f"/api/v1/reports/{evidence_id}", headers=auth_headers)
+    second = await api_client.post(f"/api/v1/reports/{evidence_id}", headers=auth_headers)
+
+    listing = await api_client.get(f"/api/v1/reports/{evidence_id}", headers=auth_headers)
+    assert listing.status_code == 200
+    reports = listing.json()["reports"]
+    assert len(reports) == 2
+    # Newest first.
+    assert reports[0]["report_id"] == second.json()["report_id"]
+    assert reports[1]["report_id"] == first.json()["report_id"]
+    assert reports[0]["generated_by"] == registered_user["email"]
+    assert reports[0]["sha256"]
+
+
+@pytest.mark.asyncio
+async def test_list_reports_does_not_include_other_evidences_reports(api_client, auth_headers, db_session):
+    evidence_a = await _create_case_with_evidence(api_client, auth_headers)
+    evidence_b = await _create_case_with_evidence(api_client, auth_headers)
+    await _complete_analysis(db_session, evidence_a)
+    await _complete_analysis(db_session, evidence_b)
+
+    await api_client.post(f"/api/v1/reports/{evidence_a}", headers=auth_headers)
+
+    listing_b = await api_client.get(f"/api/v1/reports/{evidence_b}", headers=auth_headers)
+    assert listing_b.json() == {"reports": []}

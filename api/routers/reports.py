@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.dependencies import get_db_session, get_current_user
 from api.services.report_service import generate_report_pdf
-from infrastructure.persistence.models import ReportORM, UserORM
+from infrastructure.persistence.models import AuditEventORM, ReportORM, UserORM
 
 logger = logging.getLogger("ReportsRouter")
 router = APIRouter()
@@ -93,6 +93,13 @@ async def generate_court_report(
         generated_by=current_user.email,
         generated_at=now,
     ))
+    db.add(AuditEventORM(
+        id=uuid.uuid4(),
+        resource_id=evidence_id,
+        action="REPORT_GENERATED",
+        created_at=now,
+        performed_by=current_user.email,
+    ))
     await db.commit()
 
     return {
@@ -101,6 +108,37 @@ async def generate_court_report(
         "evidence_id": str(evidence_id),
         "sha256": sha256,
         "generated_at": now.isoformat(),
+    }
+
+
+@router.get("/{evidence_id}")
+async def list_reports(
+    evidence_id: UUID,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: UserORM = Depends(get_current_user),
+):
+    """Lists previously generated reports for a piece of evidence, newest
+    first. generate_court_report's response is the only other place a
+    report_id ever surfaces - without this, dismissing that one-time
+    download prompt meant the report was effectively lost even though it
+    still existed on disk."""
+    stmt = text("""
+        SELECT id, generated_by, generated_at, sha256
+        FROM core.reports
+        WHERE evidence_id = :evidence_id
+        ORDER BY generated_at DESC
+    """)
+    rows = (await db.execute(stmt, {"evidence_id": str(evidence_id)})).mappings().all()
+    return {
+        "reports": [
+            {
+                "report_id": str(row["id"]),
+                "generated_by": row["generated_by"],
+                "generated_at": row["generated_at"].isoformat(),
+                "sha256": row["sha256"],
+            }
+            for row in rows
+        ]
     }
 
 

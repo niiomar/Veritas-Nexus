@@ -164,4 +164,13 @@ export const EvidenceAPI = {
     if (!response.ok) throw new Error('Failed to download report');
     return response.blob();
   },
+
+  listReports: async (evidenceId: string): Promise<{ report_id: string; generated_by: string; generated_at: string; sha256: string }[]> => {
+    const response = await fetch(`${API_BASE_URL}/api/v1/reports/${evidenceId}`, {
+      headers: authHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to list reports');
+    const data = await response.json();
+    return data.reports || [];
+  },
 };
