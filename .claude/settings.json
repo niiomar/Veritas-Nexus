@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xxd)",
+      "Bash(xxd \"c:/Dev/veritas-nexus/frontend/src/types/index.ts\")",
+      "Bash(python3 -c ' *)",
+      "Bash(python3 -)",
+      "Bash(python -)"
+    ]
+  }
+}
