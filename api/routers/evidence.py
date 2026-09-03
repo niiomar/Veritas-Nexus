@@ -63,6 +63,7 @@ async def ingest_evidence(
     file: UploadFile = File(...),
     use_vit: bool = Form(True),
     use_c2pa: bool = Form(True),
+    use_audio: bool = Form(True),
     db: AsyncSession = Depends(get_db),
     current_user: UserORM = Depends(get_current_user),
 ):
@@ -104,6 +105,7 @@ async def ingest_evidence(
                 "content_type": file.content_type,
                 "use_vit": use_vit,
                 "use_c2pa": use_c2pa,
+                "use_audio": use_audio,
                 "exif": exif_data  # Storing the EXIF profile
             }
         )
