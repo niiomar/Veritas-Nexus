@@ -8,9 +8,10 @@ export const IngestionPipeline: React.FC<{
   activeCase: Case, 
   useVit: boolean, 
   useC2pa: boolean, 
+  useAudio: boolean,
   onComplete: () => void, 
   onError: (msg: string) => void 
-}> = ({ file, activeCase, useVit, useC2pa, onComplete, onError }) => {
+}> = ({ file, activeCase, useVit, useC2pa, useAudio, onComplete, onError }) => {
   const [step, setStep] = useState(0);
   const onCompleteRef = useRef(onComplete);
   const onErrorRef = useRef(onError);
@@ -34,7 +35,7 @@ export const IngestionPipeline: React.FC<{
         await sleep(500);
         if (!isMounted) return;
         
-        await EvidenceAPI.uploadPayload(file, activeCase.id, useVit, useC2pa);
+        await EvidenceAPI.uploadPayload(file, activeCase.id, useVit, useC2pa, useAudio);
         
         advance(5);
         await sleep(800);
@@ -49,7 +50,7 @@ export const IngestionPipeline: React.FC<{
 
     executePipeline();
     return () => { isMounted = false; controller.abort(); };
-  }, [activeCase.id, activeCase.analyst, file, useVit, useC2pa]); 
+  }, [activeCase.id, activeCase.analyst, file, useVit, useC2pa, useAudio]); 
 
   const steps = [
     { label: "INITIATING INGESTION PAYLOAD", icon: <UploadCloud size={16}/> },
