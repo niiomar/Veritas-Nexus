@@ -56,9 +56,13 @@ export const EvidenceAPI = {
       const response = await fetch(`${API_BASE_URL}/api/v1/health`);
       if (!response.ok) throw new Error('Health check failed');
       const data = await response.json();
-      return { vit: data.vit_status || 'OFFLINE', c2pa: data.c2pa_status || 'OFFLINE' };
+      return {
+        vit: data.vit_status || 'OFFLINE',
+        c2pa: data.c2pa_status || 'OFFLINE',
+        audio: data.audio_status || 'OFFLINE',
+      };
     } catch (err) {
-      return { vit: 'OFFLINE', c2pa: 'OFFLINE' };
+      return { vit: 'OFFLINE', c2pa: 'OFFLINE', audio: 'OFFLINE' };
     }
   },
 
@@ -112,7 +116,7 @@ export const EvidenceAPI = {
     return true;
   },
 
-  uploadPayload: async (file: File, caseId: string, useVit: boolean = true, useC2pa: boolean = true) => {
+  uploadPayload: async (file: File, caseId: string, useVit: boolean = true, useC2pa: boolean = true, useAudio: boolean = true) => {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("case_id", caseId);
@@ -120,6 +124,7 @@ export const EvidenceAPI = {
     // FASTAPI requires these as strings in the form data
     formData.append("use_vit", String(useVit));
     formData.append("use_c2pa", String(useC2pa));
+    formData.append("use_audio", String(useAudio));
 
     const response = await fetch(`${API_BASE_URL}/api/v1/evidence/`, {
       method: 'POST',
