@@ -27,6 +27,7 @@ export default function App() {
   
   const [useVit, setUseVit] = useState(true);
   const [useC2pa, setUseC2pa] = useState(true);
+  const [useAudio, setUseAudio] = useState(true);
   
   const [evidenceLibrary, setEvidenceLibrary] = useState<Evidence[]>([]);
   const [selectedEvidence, setSelectedEvidence] = useState<Evidence | null>(null);
@@ -53,7 +54,7 @@ export default function App() {
     undoTimerRef.current = setTimeout(() => setUndoAction(null), 8000);
   }, []);
 
-  const [engineStatus, setEngineStatus] = useState<EngineStatus>({ vit: 'ONLINE', c2pa: 'ONLINE' });
+  const [engineStatus, setEngineStatus] = useState<EngineStatus>({ vit: 'ONLINE', c2pa: 'ONLINE', audio: 'ONLINE' });
   const [lastSync, setLastSync] = useState<string>('00:00');
 
   // Validate any token left over from a previous session before rendering
@@ -97,7 +98,7 @@ export default function App() {
       const status = await EvidenceAPI.checkHealth();
       setEngineStatus(status);
     } catch (err) {
-      setEngineStatus({ vit: 'OFFLINE', c2pa: 'OFFLINE' });
+      setEngineStatus({ vit: 'OFFLINE', c2pa: 'OFFLINE', audio: 'OFFLINE' });
     }
   }, []);
 
@@ -297,7 +298,7 @@ export default function App() {
         )}
 
         {isUploading && file && activeCase && (
-          <IngestionPipeline file={file} activeCase={activeCase} useVit={useVit} useC2pa={useC2pa} onComplete={handleUploadComplete} onError={handleUploadError} />
+          <IngestionPipeline file={file} activeCase={activeCase} useVit={useVit} useC2pa={useC2pa} useAudio={useAudio} onComplete={handleUploadComplete} onError={handleUploadError} />
         )}
       </div>
 
@@ -385,19 +386,23 @@ export default function App() {
                         <input type="checkbox" checked={useC2pa} onChange={e => setUseC2pa(e.target.checked)} style={{ accentColor: 'var(--text-main)', cursor: 'pointer' }} />
                         C2PA VERIFY
                       </label>
+                      <label className="hover-bright" style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: useAudio ? 'var(--text-main)' : 'var(--text-muted)' }}>
+                        <input type="checkbox" checked={useAudio} onChange={e => setUseAudio(e.target.checked)} style={{ accentColor: 'var(--text-main)', cursor: 'pointer' }} />
+                        AUDIO
+                      </label>
                     </div>
 
                     <div style={{ width: selectedEvidence ? '100%' : 'auto' }}>
                       <input type="file" id="file-upload" style={{ display: 'none' }} onChange={(e) => { if(e.target.files?.[0]) { setFile(e.target.files[0]); setIsUploading(true); } }} />
                       <button 
                         className="hover-bright mono" 
-                        disabled={!useVit && !useC2pa}
+                        disabled={!useVit && !useC2pa && !useAudio}
                         onClick={() => document.getElementById('file-upload')?.click()} 
                         style={{ 
                           width: selectedEvidence ? '100%' : 'auto',
-                          padding: '8px 16px', background: 'transparent', color: (!useVit && !useC2pa) ? 'var(--text-muted)' : 'var(--text-main)', 
-                          border: '1px solid', borderColor: (!useVit && !useC2pa) ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.2)', 
-                          borderRadius: '4px', fontWeight: 500, fontSize: '11px', letterSpacing: '0.1em', cursor: (!useVit && !useC2pa) ? 'not-allowed' : 'pointer',
+                          padding: '8px 16px', background: 'transparent', color: (!useVit && !useC2pa && !useAudio) ? 'var(--text-muted)' : 'var(--text-main)', 
+                          border: '1px solid', borderColor: (!useVit && !useC2pa && !useAudio) ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.2)', 
+                          borderRadius: '4px', fontWeight: 500, fontSize: '11px', letterSpacing: '0.1em', cursor: (!useVit && !useC2pa && !useAudio) ? 'not-allowed' : 'pointer',
                           transition: 'all 0.2s'
                         }}
                       >
@@ -424,8 +429,10 @@ export default function App() {
                           const isActive = selectedEvidence?.id === item.id;
                           
                           const issuer = item.ai_report?.c2pa_data?.issuer || 'Unknown Publisher';
-                          const vitRan = item.ai_report?.deepfake_probability !== null;
+                          const vitRan = item.ai_report?.deepfake_probability !== null && item.ai_report?.deepfake_probability !== undefined;
                           const c2paRan = item.ai_report?.c2pa_data?.raw_status !== "Bypassed by User";
+                          const audioRan = item.ai_report?.audio_spoof_probability !== null && item.ai_report?.audio_spoof_probability !== undefined;
+                          const audioIsSpoof = item.ai_report?.platform_status === 'SPOOF_DETECTED';
                           const c2paVerified = item.ai_report?.c2pa_data?.is_signed === true;
 
                           const platformStatus = item.ai_report?.platform_status;
@@ -468,6 +475,7 @@ export default function App() {
                                      <span>•</span>
                                      <span style={{ color: vitRan ? 'var(--text-muted)' : 'var(--text-faint)' }}>ViT {vitRan ? '✓' : '-'}</span>
                                      <span style={{ color: c2paRan ? (c2paVerified ? 'var(--text-muted)' : 'var(--text-faint)') : 'var(--text-faint)' }}>C2PA {c2paRan ? (c2paVerified ? '✓' : '✕') : '-'}</span>
+                                     <span style={{ color: audioRan ? (audioIsSpoof ? 'var(--c-crit)' : 'var(--text-muted)') : 'var(--text-faint)' }}>AUDIO {audioRan ? (audioIsSpoof ? '✕' : '✓') : '-'}</span>
                                    </div>
                                 )}
                               </div>
@@ -530,6 +538,9 @@ export default function App() {
             </div>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               C2PA <span style={{ color: engineStatus.c2pa === 'ONLINE' ? '#10b981' : 'var(--c-crit)', fontWeight: 600 }}>{engineStatus.c2pa}</span>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              AUDIO <span style={{ color: engineStatus.audio === 'ONLINE' ? '#10b981' : 'var(--c-crit)', fontWeight: 600 }}>{engineStatus.audio}</span>
             </div>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               QUEUE <span style={{ color: 'var(--text-main)' }}>{activeQueueCount}</span>
