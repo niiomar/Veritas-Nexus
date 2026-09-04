@@ -49,8 +49,8 @@ The forensic engines themselves (**ViT-CORE-FORENSICS** for deepfake detection, 
 - Shared team visibility (any analyst can view any case) with creator-only edit/delete/restore rights
 - Soft-delete with a recoverable grace period, a background purge sweep, an "Undo" toast right after deleting, and a "Recently Deleted" view to recover anything within the full grace period
 - Offset/limit pagination and per-case filtering on the evidence ledger
-- A full audit trail (`core.audit_events`) for every state-changing action
-- One-click PDF report generation: an immutable, timestamped snapshot of a piece of evidence's case details, provenance, and full trust-score breakdown
+- A full audit trail (`core.audit_events`) for every state-changing action, report generation included
+- One-click PDF report generation from the evidence dossier: an immutable, timestamped snapshot of a piece of evidence's case details, provenance, and full trust-score breakdown — with a history dropdown to re-download any prior snapshot without regenerating it
 
 **Platform**
 - Real per-user auth: bcrypt password hashing, JWT access tokens, email verification and password reset flows
@@ -265,7 +265,7 @@ The full interactive OpenAPI documentation is served at `http://localhost:8000/d
 | `/api/v1/cases` | Create, list, get, update, soft-delete, restore |
 | `/api/v1/evidence` | Ingest, list (paginated), download, heatmap/patches/attention, soft-delete, restore |
 | `/api/v1/assessments` | Fetch the computed trust assessment for a piece of evidence |
-| `/api/v1/reports` | Generate and download a PDF authenticity-report snapshot for a piece of evidence |
+| `/api/v1/reports` | Generate, list, and download PDF authenticity-report snapshots for a piece of evidence |
 | `/api/v1/health` | Liveness + downstream-engine reachability |
 
 ## Security Model
@@ -274,7 +274,7 @@ The full interactive OpenAPI documentation is served at `http://localhost:8000/d
 - **Authorization**: shared team visibility — any authenticated analyst can view any case or evidence — but only the creator/uploader may edit, delete, or restore it. Enforced server-side on every mutating route.
 - **Enumeration resistance**: login and forgot-password return identical generic responses regardless of whether the account exists.
 - **Rate limiting**: register, login, and forgot-password are rate-limited per client.
-- **Soft delete**: deletes are reversible for a grace period (`api/constants.py`) before a background sweep physically purges the row and file.
+- **Soft delete**: deletes are reversible for a grace period (`api/constants.py`) before a background sweep physically purges the row and file — including any PDF reports generated from that evidence, so nothing outlives the record it was snapshotted from.
 - **Server-authoritative attribution**: `created_by`/`uploaded_by`/audit `performed_by` are always derived from the authenticated session, never from client input.
 - **Secrets**: `.env` is gitignored; the app fails fast at startup if `JWT_SECRET` is missing rather than surfacing the failure on first login.
 
@@ -287,7 +287,6 @@ GitHub Actions (`.github/workflows/ci.yml`) runs on every push and pull request 
 
 ## Known Limitations & Roadmap
 
-- Report generation isn't wired into the frontend yet — trigger it via the API (`/docs`) or a REST client until a UI button is added.
 - The frontend lint step is intentionally non-blocking in CI while a backlog of pre-existing `no-explicit-any` and strict React Compiler rule violations is worked down.
 - `opencv-python-headless` is deliberately held on the 4.x line pending verification of the 5.x major.
 - Authorization is a flat "any analyst can view, creator can edit" model; role-based access (e.g. admin override, per-case assignment) is a natural next step if the team grows.
