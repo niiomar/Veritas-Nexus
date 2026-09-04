@@ -28,6 +28,31 @@ export default function App() {
   const [useVit, setUseVit] = useState(true);
   const [useC2pa, setUseC2pa] = useState(true);
   const [useAudio, setUseAudio] = useState(true);
+
+  // Mirrors worker.py's own AUDIO_EXTENSIONS exactly (api/worker.py) — keep
+  // these two lists in sync if either ever changes.
+  const AUDIO_EXTENSIONS = ['.wav', '.flac', '.mp3', '.m4a', '.ogg', '.aac', '.wma'];
+  // null = no file staged yet (nothing to detect); true/false once one is.
+  const stagedIsAudio = file ? AUDIO_EXTENSIONS.some(ext => file.name.toLowerCase().endsWith(ext)) : null;
+
+  // An image/video can't contain an audio track and an audio file can't
+  // contain an image in this platform's current pipeline (c2pa-veritas's
+  // own gatekeeper hard-rejects audio extensions outright - see
+  // c2pa-veritas/backend/main.py's SUPPORTED_EXTS), so the irrelevant
+  // engines are force-disabled the moment a file's type is known, rather
+  // than left checked-but-meaningless.
+  useEffect(() => {
+    if (stagedIsAudio === null) return;
+    if (stagedIsAudio) {
+      setUseVit(false);
+      setUseC2pa(false);
+      setUseAudio(true);
+    } else {
+      setUseAudio(false);
+      setUseVit(true);
+      setUseC2pa(true);
+    }
+  }, [stagedIsAudio]);
   
   const [evidenceLibrary, setEvidenceLibrary] = useState<Evidence[]>([]);
   const [selectedEvidence, setSelectedEvidence] = useState<Evidence | null>(null);
@@ -378,36 +403,59 @@ export default function App() {
 
                   <div style={{ display: 'flex', flexDirection: selectedEvidence ? 'column' : 'row', alignItems: selectedEvidence ? 'flex-start' : 'center', gap: '16px', marginTop: '0', width: selectedEvidence ? '100%' : 'auto' }}>
                     <div className="mono" style={{ display: 'flex', gap: '16px', fontSize: '10px', color: 'var(--text-faint)' }}>
-                      <label className="hover-bright" style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: useVit ? 'var(--text-main)' : 'var(--text-muted)' }}>
-                        <input type="checkbox" checked={useVit} onChange={e => setUseVit(e.target.checked)} style={{ accentColor: 'var(--text-main)', cursor: 'pointer' }} />
+                      <label className="hover-bright" style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: stagedIsAudio === true ? 'not-allowed' : 'pointer', color: useVit ? 'var(--text-main)' : 'var(--text-muted)', opacity: stagedIsAudio === true ? 0.3 : 1, transition: 'opacity 0.2s' }}>
+                        <input type="checkbox" checked={useVit} disabled={stagedIsAudio === true} onChange={e => setUseVit(e.target.checked)} style={{ accentColor: 'var(--text-main)', cursor: stagedIsAudio === true ? 'not-allowed' : 'pointer' }} />
                         ViT-CORE
                       </label>
-                      <label className="hover-bright" style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: useC2pa ? 'var(--text-main)' : 'var(--text-muted)' }}>
-                        <input type="checkbox" checked={useC2pa} onChange={e => setUseC2pa(e.target.checked)} style={{ accentColor: 'var(--text-main)', cursor: 'pointer' }} />
+                      <label className="hover-bright" style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: stagedIsAudio === true ? 'not-allowed' : 'pointer', color: useC2pa ? 'var(--text-main)' : 'var(--text-muted)', opacity: stagedIsAudio === true ? 0.3 : 1, transition: 'opacity 0.2s' }}>
+                        <input type="checkbox" checked={useC2pa} disabled={stagedIsAudio === true} onChange={e => setUseC2pa(e.target.checked)} style={{ accentColor: 'var(--text-main)', cursor: stagedIsAudio === true ? 'not-allowed' : 'pointer' }} />
                         C2PA VERIFY
                       </label>
-                      <label className="hover-bright" style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: useAudio ? 'var(--text-main)' : 'var(--text-muted)' }}>
-                        <input type="checkbox" checked={useAudio} onChange={e => setUseAudio(e.target.checked)} style={{ accentColor: 'var(--text-main)', cursor: 'pointer' }} />
+                      <label className="hover-bright" style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: stagedIsAudio === false ? 'not-allowed' : 'pointer', color: useAudio ? 'var(--text-main)' : 'var(--text-muted)', opacity: stagedIsAudio === false ? 0.3 : 1, transition: 'opacity 0.2s' }}>
+                        <input type="checkbox" checked={useAudio} disabled={stagedIsAudio === false} onChange={e => setUseAudio(e.target.checked)} style={{ accentColor: 'var(--text-main)', cursor: stagedIsAudio === false ? 'not-allowed' : 'pointer' }} />
                         AUDIO
                       </label>
                     </div>
 
-                    <div style={{ width: selectedEvidence ? '100%' : 'auto' }}>
-                      <input type="file" id="file-upload" style={{ display: 'none' }} onChange={(e) => { if(e.target.files?.[0]) { setFile(e.target.files[0]); setIsUploading(true); } }} />
-                      <button 
-                        className="hover-bright mono" 
-                        disabled={!useVit && !useC2pa && !useAudio}
-                        onClick={() => document.getElementById('file-upload')?.click()} 
-                        style={{ 
-                          width: selectedEvidence ? '100%' : 'auto',
-                          padding: '8px 16px', background: 'transparent', color: (!useVit && !useC2pa && !useAudio) ? 'var(--text-muted)' : 'var(--text-main)', 
-                          border: '1px solid', borderColor: (!useVit && !useC2pa && !useAudio) ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.2)', 
-                          borderRadius: '4px', fontWeight: 500, fontSize: '11px', letterSpacing: '0.1em', cursor: (!useVit && !useC2pa && !useAudio) ? 'not-allowed' : 'pointer',
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        ＋ INGEST
-                      </button>
+                    <div style={{ width: selectedEvidence ? '100%' : 'auto', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <input type="file" id="file-upload" style={{ display: 'none' }} onChange={(e) => { if(e.target.files?.[0]) { setFile(e.target.files[0]); } }} />
+                      {!file ? (
+                        <button 
+                          className="hover-bright mono" 
+                          disabled={!useVit && !useC2pa && !useAudio}
+                          onClick={() => document.getElementById('file-upload')?.click()} 
+                          style={{ 
+                            width: selectedEvidence ? '100%' : 'auto',
+                            padding: '8px 16px', background: 'transparent', color: (!useVit && !useC2pa && !useAudio) ? 'var(--text-muted)' : 'var(--text-main)', 
+                            border: '1px solid', borderColor: (!useVit && !useC2pa && !useAudio) ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.2)', 
+                            borderRadius: '4px', fontWeight: 500, fontSize: '11px', letterSpacing: '0.1em', cursor: (!useVit && !useC2pa && !useAudio) ? 'not-allowed' : 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          ＋ INGEST
+                        </button>
+                      ) : (
+                        <>
+                          <span className="mono" style={{ fontSize: '10px', color: 'var(--text-faint)', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={file.name}>
+                            {file.name}
+                          </span>
+                          <button
+                            className="hover-bright mono"
+                            onClick={() => setIsUploading(true)}
+                            style={{ padding: '8px 16px', background: 'transparent', color: 'var(--text-main)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '4px', fontWeight: 500, fontSize: '11px', letterSpacing: '0.1em', cursor: 'pointer', transition: 'all 0.2s' }}
+                          >
+                            CONFIRM
+                          </button>
+                          <button
+                            className="hover-bright mono"
+                            onClick={() => setFile(null)}
+                            style={{ padding: '8px 10px', background: 'transparent', color: 'var(--text-faint)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', fontSize: '11px', cursor: 'pointer' }}
+                            title="Cancel, pick a different file"
+                          >
+                            ✕
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
