@@ -33,16 +33,16 @@
 
 ## Overview
 
-Veritas Nexus lets an investigative team ingest digital media (images/video), run it through two independent forensic signals — an AI-authenticity classifier and cryptographic provenance verification (C2PA) — and get back a single, weighted trust assessment with full evidence and audit trail. Cases and evidence are shared across a team of analysts, with server-authoritative attribution (who created/uploaded what) and soft-delete recovery instead of destructive deletes.
+Veritas Nexus lets an investigative team ingest digital media, run it through independent forensic signals, and get back a single trust assessment with full evidence and audit trail. Images/video get an AI-authenticity classifier plus cryptographic provenance verification (C2PA), weighted into one score; audio gets a dedicated voice-spoof/deepfake classifier with its own verdict tiers (the two pipelines are mutually exclusive per file — an upload is routed to one or the other by media type, never both). Cases and evidence are shared across a team of analysts, with server-authoritative attribution (who created/uploaded what) and soft-delete recovery instead of destructive deletes.
 
-The forensic engines themselves (**ViT-CORE-FORENSICS** for deepfake detection, **C2PA-Veritas** for manifest verification) are external, pluggable microservices — this repository is the orchestration layer, case management system, and analyst workstation around them. The platform is fully usable without either engine running; it just scores evidence with whatever signals are available and reports the rest as offline.
+The forensic engines themselves (**ViT-CORE-FORENSICS** for image/video deepfake detection, **ViT-CORE-Audio** for voice-spoof detection, **C2PA-Veritas** for manifest verification) are external, pluggable microservices — this repository is the orchestration layer, case management system, and analyst workstation around them. The platform is fully usable without any of them running; it just scores evidence with whatever signals are available and reports the rest as offline.
 
 ## Key Features
 
 **Forensic pipeline**
 - Async ingestion with SHA-256 hashing, EXIF/metadata extraction, and OpenCV-based Error Level Analysis, all off the request thread
-- Pluggable AI-authenticity and C2PA provenance engines, invoked by a background worker so uploads never block on a slow model
-- A deterministic, weighted trust-scoring model across six forensic domains (see [below](#trust-scoring-model))
+- Pluggable AI-authenticity, C2PA provenance, and audio voice-spoof engines, invoked by a background worker so uploads never block on a slow model
+- A deterministic, weighted trust-scoring model across six forensic domains for images/video, and a dedicated three-tier verdict for audio (see [below](#trust-scoring-model))
 - Graceful degradation: missing engines, corrupt files, or unsupported formats produce an explicit disposition instead of a crash
 
 **Case & evidence management**
@@ -80,14 +80,16 @@ flowchart LR
 
     ViT["ViT-CORE-FORENSICS<br/>(external, pluggable)"]
     C2PA["C2PA-Veritas<br/>(external, pluggable)"]
+    Audio["ViT-CORE-Audio<br/>(external, pluggable)"]
 
     FE -- "JWT Bearer" --> API
     API --> DB
     API --> Vault
     Worker --> DB
     Worker --> Vault
-    Worker -- "deepfake probability" --> ViT
-    Worker -- "manifest verification" --> C2PA
+    Worker -- "deepfake probability<br/>(image/video)" --> ViT
+    Worker -- "manifest verification<br/>(image/video)" --> C2PA
+    Worker -- "spoof probability<br/>(audio)" --> Audio
     Worker -- "weighted score" --> DB
 ```
 
@@ -99,7 +101,7 @@ flowchart LR
 
 ## Trust Scoring Model
 
-Every piece of evidence is scored across six independent, additive domains (`api/services/assessment_engine.py`), summing to a 0–100 confidence score:
+Images and video are scored across six independent, additive domains (`api/services/assessment_engine.py`), summing to a 0–100 confidence score:
 
 | Domain | Max Points | Signal |
 |---|---|---|
@@ -121,6 +123,16 @@ The final score maps to a verdict:
 | < 40 | `INCONCLUSIVE` |
 
 Unsupported formats or media rejected by the AI engine short-circuit straight to a `REJECTED` disposition without running the rest of the pipeline.
+
+**Audio is scored separately** (`evaluate_audio_assessment`, policy `Audio_Spoof_v1.0`) — the six image/video domains above are all visual concepts (EXIF, ELA, C2PA signatures) with no audio equivalent, so audio evidence never runs through them. A single "Neural Audio Authenticity" score of `(1 − spoof_probability) × 100` drives a three-tier verdict instead:
+
+| Spoof probability | Verdict |
+|---|---|
+| < 0.20 | `VERIFIED` — `BONAFIDE_VERIFIED` |
+| 0.20–0.59 | `INCONCLUSIVE` — `REVIEW_REQUIRED` |
+| ≥ 0.60 | `CRITICAL` — `SPOOF_DETECTED` |
+
+Both thresholds are env-configurable (`AUDIO_SPOOF_REVIEW_THRESHOLD`, `AUDIO_SPOOF_QUARANTINE_THRESHOLD`) and are explicitly provisional defaults pending calibration against the audio model's real evaluation set.
 
 ## Tech Stack
 
@@ -218,7 +230,7 @@ Copy the verification link from the log output into your browser to activate the
 
 ### Optional: the forensic engines
 
-`VIT_CORE_URL` and `C2PA_URL` point at external microservices (default: `host.docker.internal:8001`/`:8002`), which are **not part of this repository**. Without them, evidence still ingests and scores normally — the AI-authenticity and provenance domains simply report no signal, and `GET /api/v1/health` shows them `OFFLINE`.
+`VIT_CORE_URL`, `C2PA_URL`, and `AUDIO_URL` point at external microservices (default: `host.docker.internal:8001`/`:8002`/`:8003`), which are **not part of this repository**. Without them, evidence still ingests and scores normally — the corresponding domains simply report no signal, and `GET /api/v1/health` shows them `OFFLINE`.
 
 ## Configuration Reference
 
@@ -229,12 +241,14 @@ All variables live in `.env` (root, consumed by the backend) and `frontend/.env`
 | `JWT_SECRET` | **Yes** | — | Signs access/verification/reset tokens. The app refuses to start without it. |
 | `VIT_CORE_API_KEY` | No | — | Auth for the external ViT-CORE deepfake-detection engine. |
 | `C2PA_API_KEY` | No | — | Auth for the external C2PA-Veritas provenance engine. |
+| `AUDIO_API_KEY` | No | — | Auth for the external ViT-CORE-Audio voice-spoof engine. |
 | `FRONTEND_URL` | No | `http://localhost:5173` | Base URL used to build verification/reset links in emails. |
 | `CORS_ORIGINS` | No | `http://localhost:5173,http://127.0.0.1:5173` | Comma-separated allowed origins. Set explicitly in production. |
 | `EVIDENCE_VAULT_PATH` | No | `/app/storage_vault` | Where uploaded evidence is written inside the container. |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USERNAME` / `SMTP_PASSWORD` / `SMTP_FROM` | No | unset (log-only) | Configure to send real verification/reset emails instead of logging them. |
 | `DATABASE_URL` | No | points at the compose `db` service | Override to point the API at a different Postgres instance. |
-| `VIT_CORE_URL` / `C2PA_URL` | No | `host.docker.internal:8001`/`:8002` | Endpoints for the external forensic microservices. |
+| `VIT_CORE_URL` / `C2PA_URL` / `AUDIO_URL` | No | `host.docker.internal:8001`/`:8002`/`:8003` | Endpoints for the external forensic microservices. |
+| `AUDIO_SPOOF_REVIEW_THRESHOLD` / `AUDIO_SPOOF_QUARANTINE_THRESHOLD` | No | `0.20` / `0.60` | Spoof-probability cutoffs for the audio verdict tiers — see [Trust Scoring Model](#trust-scoring-model). |
 | `VITE_API_URL` (frontend) | No | `http://localhost:8000` | Base URL the frontend calls for the API. |
 
 ## Running Tests
