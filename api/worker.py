@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from sqlalchemy import select, text
 from infrastructure.persistence.database import async_session_maker
 from infrastructure.persistence.models import AnalysisJobORM, EvidenceORM, CaseORM
-from api.services.assessment_engine import evaluate_assessment
+from api.services.assessment_engine import evaluate_assessment, evaluate_audio_assessment
 from api.constants import SOFT_DELETE_GRACE_PERIOD
 
 load_dotenv()
@@ -274,7 +274,7 @@ async def execute_correlation_engine(job_id: str, evidence_id: str, session):
                     "threat_summary": "Analysis incomplete — engine unavailable."
                 }
 
-        report_data["assessment"] = evaluate_assessment(report_data, exif)
+        report_data["assessment"] = evaluate_audio_assessment(report_data)
         update_stmt = text("UPDATE analysis.analysis_jobs SET ai_report = :report, status = 'COMPLETED' WHERE id = :job_id")
         await session.execute(update_stmt, {"report": json.dumps(report_data), "job_id": job_id})
         logger.info(f"[JOB {job_id}] Audio correlation assessment complete.")

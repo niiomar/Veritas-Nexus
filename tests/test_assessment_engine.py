@@ -7,7 +7,7 @@ future refactor can't silently reintroduce that kind of drift.
 """
 import pytest
 
-from api.services.assessment_engine import evaluate_assessment
+from api.services.assessment_engine import evaluate_assessment, evaluate_audio_assessment
 
 
 def make_ai_report(**overrides):
@@ -172,3 +172,47 @@ class TestVerdictLogic:
         report = make_ai_report(deepfake_probability=0.05, c2pa_data={"is_signed": True, "status": "VALID"})
         result = evaluate_assessment(report, exif=None)
         assert result["conf"] == "60.0"
+
+
+class TestAudioAssessment:
+    """Regression coverage for a real bug: api/worker.py's audio path used
+    to call evaluate_assessment (the visual scorer) on audio-shaped report
+    data instead of this function. evaluate_assessment has no concept of
+    audio_spoof_probability, so every audio file - genuine or a detected
+    spoof - silently landed on the same "INCONCLUSIVE" verdict regardless
+    of what the audio engine actually found. See tests/test_worker_audio.py
+    for the worker-level dispatch test that would have caught this."""
+
+    def test_rejected_short_circuits_like_the_visual_path(self):
+        result = evaluate_audio_assessment({"platform_status": "REJECTED"})
+        assert result["verdict"] == "REJECTED"
+        assert result["totalScore"] == 0
+
+    def test_missing_probability_is_unknown_not_a_crash(self):
+        """Engine offline or bypassed by user preference - both leave
+        audio_spoof_probability unset."""
+        result = evaluate_audio_assessment({"platform_status": "UNKNOWN", "audio_spoof_probability": None})
+        assert result["verdict"] == "UNKNOWN"
+        assert result["totalScore"] == 0
+
+    def test_low_spoof_probability_is_verified_with_high_confidence(self):
+        result = evaluate_audio_assessment({"platform_status": "BONAFIDE_VERIFIED", "audio_spoof_probability": 0.05})
+        assert result["verdict"] == "VERIFIED"
+        assert result["conf"] == "95.0"
+
+    def test_mid_spoof_probability_is_inconclusive(self):
+        result = evaluate_audio_assessment({"platform_status": "REVIEW_REQUIRED", "audio_spoof_probability": 0.4})
+        assert result["verdict"] == "INCONCLUSIVE"
+
+    def test_high_spoof_probability_is_critical_with_low_confidence(self):
+        """The exact case the bug got backwards: a detected spoof must
+        score low, not fall through to the same result as a clean file."""
+        result = evaluate_audio_assessment({"platform_status": "SPOOF_DETECTED", "audio_spoof_probability": 0.95})
+        assert result["verdict"] == "CRITICAL"
+        assert result["conf"] == "5.0"
+
+    def test_clean_and_spoofed_audio_never_produce_the_same_verdict(self):
+        clean = evaluate_audio_assessment({"platform_status": "BONAFIDE_VERIFIED", "audio_spoof_probability": 0.05})
+        spoofed = evaluate_audio_assessment({"platform_status": "SPOOF_DETECTED", "audio_spoof_probability": 0.95})
+        assert clean["verdict"] != spoofed["verdict"]
+        assert clean["totalScore"] != spoofed["totalScore"]
