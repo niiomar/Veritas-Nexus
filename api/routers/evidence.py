@@ -28,7 +28,7 @@ load_dotenv()
 # Setup logging
 logger = logging.getLogger("EvidenceRouter")
 
-router = APIRouter(prefix="/api/v1/evidence", tags=["Evidence"])
+router = APIRouter()
 # Must match the docker-compose "nexus_storage" volume's mount point
 # (/app/storage_vault) - a bare "/vault" silently wrote into the container's
 # ephemeral layer instead of the persisted volume, and required root to
