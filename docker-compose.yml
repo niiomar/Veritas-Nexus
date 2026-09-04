@@ -35,6 +35,7 @@ services:
       # Sourced from the project's untracked .env file (see .env.example).
       - VIT_CORE_API_KEY=${VIT_CORE_API_KEY}
       - C2PA_API_KEY=${C2PA_API_KEY}
+      - AUDIO_API_KEY=${AUDIO_API_KEY}
       - JWT_SECRET=${JWT_SECRET}
       - FRONTEND_URL=${FRONTEND_URL}
       - CORS_ORIGINS=${CORS_ORIGINS}

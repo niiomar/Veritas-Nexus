@@ -4,8 +4,6 @@ import type { Evidence } from '../types';
 import { AssessmentEngine } from '../services/assessment';
 import { EvidenceAPI } from '../services/api';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-
 const dossierStyles = `
   @keyframes fadeIn {
     from { opacity: 0; }
@@ -75,6 +73,13 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
   const c2pa = evidence?.ai_report?.c2pa_data;
   const vitProb = evidence?.ai_report?.deepfake_probability;
   const platformStatus = evidence?.ai_report?.platform_status;
+
+  // AUDIO_EXTENSIONS mirrors worker.py's own set exactly (api/worker.py) —
+  // keep these two lists in sync if either ever changes.
+  const AUDIO_EXTENSIONS = ['.wav', '.flac', '.mp3', '.m4a', '.ogg', '.aac', '.wma'];
+  const isAudio = AUDIO_EXTENSIONS.some(ext => (evidence?.filename || '').toLowerCase().endsWith(ext));
+  const audioProb = evidence?.ai_report?.audio_spoof_probability;
+  const isAudioUnavailable = audioProb === null || audioProb === undefined;
   
   // @ts-ignore
   const exif = evidence?.metadata_dict?.exif;
@@ -155,6 +160,17 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
   const probColor = isClean ? '#10b981' : isWarning ? '#f59e0b' : isCritical ? '#ef4444' : 'var(--text-muted)';
   const probText = isClean ? 'NOMINAL' : isWarning ? 'SUSPICIOUS' : isCritical ? 'CRITICAL' : 'N/A';
 
+  // Audio equivalent — mirrors the visual block above exactly, but at
+  // 0.20/0.60, matching worker.py's compute_audio_disposition() rather
+  // than the visual model's 0.15/0.70 (see the earlier discussion on why
+  // those thresholds don't transfer between models).
+  const isAudioClean = !isAudioUnavailable && audioProb !== null && audioProb < 0.20;
+  const isAudioWarning = !isAudioUnavailable && audioProb !== null && audioProb >= 0.20 && audioProb < 0.60;
+  const isAudioCritical = !isAudioUnavailable && audioProb !== null && audioProb >= 0.60;
+
+  const audioProbColor = isAudioClean ? '#10b981' : isAudioWarning ? '#f59e0b' : isAudioCritical ? '#ef4444' : 'var(--text-muted)';
+  const audioProbText = isAudioClean ? 'NOMINAL' : isAudioWarning ? 'SUSPICIOUS' : isAudioCritical ? 'CRITICAL' : 'N/A';
+
   // TIMELINE FORENSIC REASONING CALCULATIONS
   const parseExifDate = (dateStr: string) => {
     if (!dateStr) return null;
@@ -183,6 +199,11 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
   const [imageTab, setImageTab] = useState<'SOURCE' | 'HEATMAP' | 'ATTENTION'>('SOURCE');
   
   const [imageFailed, setImageFailed] = useState(false);
+  const [mediaBlobUrl, setMediaBlobUrl] = useState('');
+  const [mediaLoading, setMediaLoading] = useState(false);
+  const [audioBlobUrl, setAudioBlobUrl] = useState('');
+  const [audioFailed, setAudioFailed] = useState(false);
+  const [mediaRetryCount, setMediaRetryCount] = useState(0);
   const [copiedRaw, setCopiedRaw] = useState<'C2PA' | 'VIT' | null>(null);
   const [copiedInline, setCopiedInline] = useState<'HASH' | 'MANIFEST' | null>(null);
   
@@ -194,8 +215,6 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
   const [zoom, setZoom] = useState(1);
   const [expandedCorrelation, setExpandedCorrelation] = useState<'ISSUER' | 'DAY' | null>(null);
 
-  const [viewSession] = useState(Date.now());
-  const [imageTokens, setImageTokens] = useState<Record<string, number>>({});
 
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
@@ -255,14 +274,58 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
     setZoom(1);
   }, [evidence?.id, imageTab]);
 
-  const getImageUrl = useCallback((tab: string) => {
-    if (!evidence?.id) return '';
-    const token = imageTokens[tab] || viewSession;
-    const qs = `?v=${token}`;
-    if (tab === 'HEATMAP') return `${API_BASE_URL}/api/v1/evidence/${evidence.id}/heatmap${qs}`;
-    if (tab === 'ATTENTION') return `${API_BASE_URL}/api/v1/evidence/${evidence.id}/attention${qs}`;
-    return `${API_BASE_URL}/api/v1/evidence/${evidence.id}/download${qs}`; 
-  }, [evidence?.id, viewSession, imageTokens]);
+  // <img>/<audio> src attributes can't send the Authorization header
+  // get_current_user requires (see EvidenceAPI.fetchMediaBlob's comment
+  // in api.ts) - both fetch their media as an authenticated blob instead
+  // and point src at a local object URL. Cleanup revokes the previous
+  // object URL on every re-run (tab switch, retry, or unmount) so this
+  // doesn't leak memory over a long session.
+  useEffect(() => {
+    if (!evidence?.id || mainTab !== 'MEDIA' || isAudio) return;
+    let cancelled = false;
+    let objectUrl = '';
+    // Clear stale content immediately, not just on failure - without this,
+    // switching from SOURCE to HEATMAP kept showing the SOURCE image for
+    // as long as the (genuinely slow, up to 45s - see fetch_visual_from_
+    // microservice's timeout) heatmap/attention re-analysis was in flight,
+    // which looked exactly like "heatmap is just the source image" rather
+    // than "heatmap is still loading."
+    setImageFailed(false);
+    setMediaBlobUrl('');
+    setMediaLoading(true);
+    const kind = imageTab === 'HEATMAP' ? 'heatmap' : imageTab === 'ATTENTION' ? 'attention' : 'download';
+    EvidenceAPI.fetchMediaBlob(evidence.id, kind)
+      .then(url => {
+        if (cancelled) { URL.revokeObjectURL(url); return; }
+        objectUrl = url;
+        setMediaBlobUrl(url);
+        setMediaLoading(false);
+      })
+      .catch(() => { if (!cancelled) { setImageFailed(true); setMediaLoading(false); } });
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [evidence?.id, imageTab, isAudio, mainTab, mediaRetryCount]);
+
+  useEffect(() => {
+    if (!evidence?.id || mainTab !== 'MEDIA' || !isAudio) return;
+    let cancelled = false;
+    let objectUrl = '';
+    setAudioFailed(false);
+    setAudioBlobUrl('');
+    EvidenceAPI.fetchMediaBlob(evidence.id, 'download')
+      .then(url => {
+        if (cancelled) { URL.revokeObjectURL(url); return; }
+        objectUrl = url;
+        setAudioBlobUrl(url);
+      })
+      .catch(() => { if (!cancelled) setAudioFailed(true); });
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [evidence?.id, isAudio, mainTab, mediaRetryCount]);
 
   const handleCopy = (type: 'C2PA' | 'VIT', data: any) => {
     navigator.clipboard.writeText(JSON.stringify(data, null, 2));
@@ -508,6 +571,91 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
           <div style={{ flexShrink: 0, padding: '40px 48px', paddingBottom: '80px' }}>
             
             {mainTab === 'MEDIA' && (
+              isAudio ? (
+              <div style={{ display: 'flex', flexDirection: 'column', width: '100%', maxWidth: '1000px', margin: '0 auto', gap: '24px' }}>
+                <div style={{ width: '100%', backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', overflow: 'hidden' }}>
+
+                  <div className="mono" style={{ padding: '16px 32px', backgroundColor: '#111', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: '11px', color: 'var(--text-faint)', letterSpacing: '0.15em' }}>
+                    AUDIO EVIDENCE
+                  </div>
+
+                  <div style={{ width: '100%', minHeight: '200px', backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '48px 32px' }}>
+                    {audioFailed ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                        <div className="mono" style={{ color: 'var(--c-crit)', fontSize: '11px', letterSpacing: '0.15em' }}>⚠ RENDER FAILED</div>
+                        <button
+                          onClick={() => setMediaRetryCount(c => c + 1)}
+                          className="mono hover-bright"
+                          style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: 'var(--text-main)', padding: '6px 16px', fontSize: '10px', letterSpacing: '0.1em', cursor: 'pointer', borderRadius: '4px' }}
+                        >
+                          FORCE RETRY
+                        </button>
+                      </div>
+                    ) : evidence?.id && audioBlobUrl && (
+                      <audio controls style={{ width: '100%', maxWidth: '500px' }} src={audioBlobUrl}>
+                        Your browser does not support audio playback.
+                      </audio>
+                    )}
+                  </div>
+
+                  {/* AUDIO XAI THREAT GAUGE — mirrors the visual SYNTHETIC LIKELIHOOD
+                      gauge below exactly, at the audio model's own 0.20/0.60 zone
+                      boundaries rather than the visual model's 0.15/0.70. */}
+                  <div className="mono" style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr', padding: '24px 32px', fontSize: '11px', color: 'var(--text-faint)', letterSpacing: '0.05em', background: 'rgba(255,255,255,0.02)', gap: '32px' }}>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                      <div style={{ marginBottom: '18px', color: 'var(--text-main)', fontSize: '11px', letterSpacing: '0.1em' }}>
+                        SYNTHETIC AUDIO LIKELIHOOD
+                      </div>
+                      <div style={{ position: 'relative', height: '6px', width: '100%', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '3px' }}>
+                        {!isAudioUnavailable && (
+                          <>
+                            <div style={{ position: 'absolute', left: '0%', width: '20%', height: '100%', backgroundColor: '#10b981', opacity: 0.4, borderRadius: '3px 0 0 3px' }}></div>
+                            <div style={{ position: 'absolute', left: '20%', width: '40%', height: '100%', backgroundColor: '#f59e0b', opacity: 0.4 }}></div>
+                            <div style={{ position: 'absolute', left: '60%', width: '40%', height: '100%', backgroundColor: '#ef4444', opacity: 0.4, borderRadius: '0 3px 3px 0' }}></div>
+
+                            <div style={{ position: 'absolute', left: '20%', top: '0', bottom: '0', width: '2px', backgroundColor: '#050505' }}></div>
+                            <div style={{ position: 'absolute', left: '60%', top: '0', bottom: '0', width: '2px', backgroundColor: '#050505' }}></div>
+
+                            <div style={{ position: 'absolute', left: '0%', top: '12px', fontSize: '9px', color: 'var(--text-muted)' }}>0%</div>
+                            <div style={{ position: 'absolute', left: '20%', top: '12px', transform: 'translateX(-50%)', fontSize: '9px', color: 'var(--text-muted)' }}>20%</div>
+                            <div style={{ position: 'absolute', left: '60%', top: '12px', transform: 'translateX(-50%)', fontSize: '9px', color: 'var(--text-muted)' }}>60%</div>
+                            <div style={{ position: 'absolute', left: '100%', top: '12px', transform: 'translateX(-100%)', fontSize: '9px', color: 'var(--text-muted)' }}>100%</div>
+                          </>
+                        )}
+                        {typeof audioProb === 'number' && (
+                          <div style={{ position: 'absolute', left: `${audioProb * 100}%`, top: '-6px', bottom: '-6px', width: '3px', backgroundColor: '#fff', boxShadow: '0 0 8px rgba(255,255,255,1)', zIndex: 2, transform: 'translateX(-50%)', borderRadius: '1px' }}></div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', paddingLeft: '16px' }}>
+                      <div style={{ marginBottom: '10px' }}>SPOOF PROBABILITY</div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                        <span style={{color: audioProbColor, fontSize: '16px', fontWeight: 600}}>
+                          {typeof audioProb === 'number' ? `${(audioProb * 100).toFixed(1)}%` : '--'}
+                        </span>
+                        <span style={{ fontSize: '10px', color: audioProbColor, opacity: 0.8, fontWeight: 600 }}>
+                          {audioProbText}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '8px' }}>
+                      <div className="mono" style={{ fontSize: '10px', color: 'var(--text-faint)', letterSpacing: '0.1em' }}>
+                        DUAL-VIEW ENGINE
+                      </div>
+                      <div className="mono" style={{ fontSize: '13px', color: isAudioUnavailable ? 'var(--text-muted)' : 'var(--text-main)', fontWeight: 600 }}>
+                        {isAudioUnavailable ? 'N/A' : 'Mel + CQT Analysis'}
+                      </div>
+                      <div style={{ fontSize: '10px', color: 'var(--text-faint)' }}>
+                        {isAudioUnavailable ? 'Neural engine unavailable or bypassed' : 'ViT-CORE-Audio dual-spectrogram inference'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              ) : (
               <div style={{ display: 'flex', flexDirection: 'column', width: '100%', maxWidth: '1000px', margin: '0 auto', gap: '24px' }}>
                 <div style={{ width: '100%', backgroundColor: '#0a0a0c', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', overflow: 'hidden' }}>
                   
@@ -554,6 +702,13 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
                           The MTCNN preprocessing pipeline requires a viable human face to perform spatial deepfake analysis.
                         </div>
                       </div>
+                    ) : mediaLoading ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', zIndex: 10 }}>
+                        <Loader2 size={20} className="animate-spin" style={{ color: 'var(--text-muted)' }} />
+                        <div style={{ color: 'var(--text-muted)', fontSize: '11px', textAlign: 'center', maxWidth: '300px', lineHeight: 1.6 }}>
+                          {imageTab === 'SOURCE' ? 'Loading evidence file…' : `Generating ${imageTab.toLowerCase()} — this re-runs live inference and can take up to 45 seconds.`}
+                        </div>
+                      </div>
                     ) : imageFailed ? (
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', zIndex: 10 }}>
                         <div className="mono" style={{ color: 'var(--c-crit)', fontSize: '11px', letterSpacing: '0.15em' }}>⚠ RENDER FAILED</div>
@@ -563,7 +718,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
                         <button 
                           onClick={() => {
                             setImageFailed(false);
-                            setImageTokens(prev => ({ ...prev, [imageTab]: Date.now() }));
+                            setMediaRetryCount(c => c + 1);
                           }}
                           className="mono hover-bright"
                           style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: 'var(--text-main)', padding: '6px 16px', fontSize: '10px', letterSpacing: '0.1em', cursor: 'pointer', borderRadius: '4px' }}
@@ -573,7 +728,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
                       </div>
                     ) : (
                       <div style={{ transform: `scale(${zoom})`, transformOrigin: 'center center', transition: 'transform 0.2s ease', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <img src={getImageUrl(imageTab)} alt={`Forensic ${imageTab}`} className="animate-fade-in" style={{ width: '100%', height: '100%', objectFit: 'contain' }} onError={() => setImageFailed(true)} onLoad={() => setImageFailed(false)} />
+                        <img src={mediaBlobUrl} alt={`Forensic ${imageTab}`} className="animate-fade-in" style={{ width: '100%', height: '100%', objectFit: 'contain' }} onError={() => setImageFailed(true)} onLoad={() => setImageFailed(false)} />
                       </div>
                     )}
                   </div>
@@ -637,6 +792,7 @@ export const DecisionWorkspace: React.FC<{ evidence: Evidence, caseEvidence?: Ev
                   </div>
                 </div>
               </div>
+              )
             )}
 
             {mainTab === 'METADATA' && (

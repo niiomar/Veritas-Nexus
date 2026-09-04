@@ -38,7 +38,8 @@ export interface C2PAData {
 }
 
 export interface AIReport {
-  deepfake_probability: number | null;
+  deepfake_probability?: number | null;
+  audio_spoof_probability?: number | null;
   c2pa_data: C2PAData | null;
   platform_status: string;
   disposition: string;
@@ -80,6 +81,7 @@ export interface EvidenceAssessment {
 export interface EngineStatus {
   vit: 'ONLINE' | 'OFFLINE' | 'DEGRADED';
   c2pa: 'ONLINE' | 'OFFLINE' | 'DEGRADED';
+  audio: 'ONLINE' | 'OFFLINE' | 'DEGRADED';
 }
 
 export interface AuthUser {

@@ -27,6 +27,32 @@ export default function App() {
   
   const [useVit, setUseVit] = useState(true);
   const [useC2pa, setUseC2pa] = useState(true);
+  const [useAudio, setUseAudio] = useState(true);
+
+  // Mirrors worker.py's own AUDIO_EXTENSIONS exactly (api/worker.py) — keep
+  // these two lists in sync if either ever changes.
+  const AUDIO_EXTENSIONS = ['.wav', '.flac', '.mp3', '.m4a', '.ogg', '.aac', '.wma'];
+  // null = no file staged yet (nothing to detect); true/false once one is.
+  const stagedIsAudio = file ? AUDIO_EXTENSIONS.some(ext => file.name.toLowerCase().endsWith(ext)) : null;
+
+  // An image/video can't contain an audio track and an audio file can't
+  // contain an image in this platform's current pipeline (c2pa-veritas's
+  // own gatekeeper hard-rejects audio extensions outright - see
+  // c2pa-veritas/backend/main.py's SUPPORTED_EXTS), so the irrelevant
+  // engines are force-disabled the moment a file's type is known, rather
+  // than left checked-but-meaningless.
+  useEffect(() => {
+    if (stagedIsAudio === null) return;
+    if (stagedIsAudio) {
+      setUseVit(false);
+      setUseC2pa(false);
+      setUseAudio(true);
+    } else {
+      setUseAudio(false);
+      setUseVit(true);
+      setUseC2pa(true);
+    }
+  }, [stagedIsAudio]);
   
   const [evidenceLibrary, setEvidenceLibrary] = useState<Evidence[]>([]);
   const [selectedEvidence, setSelectedEvidence] = useState<Evidence | null>(null);
@@ -53,7 +79,7 @@ export default function App() {
     undoTimerRef.current = setTimeout(() => setUndoAction(null), 8000);
   }, []);
 
-  const [engineStatus, setEngineStatus] = useState<EngineStatus>({ vit: 'ONLINE', c2pa: 'ONLINE' });
+  const [engineStatus, setEngineStatus] = useState<EngineStatus>({ vit: 'ONLINE', c2pa: 'ONLINE', audio: 'ONLINE' });
   const [lastSync, setLastSync] = useState<string>('00:00');
 
   // Validate any token left over from a previous session before rendering
@@ -97,7 +123,7 @@ export default function App() {
       const status = await EvidenceAPI.checkHealth();
       setEngineStatus(status);
     } catch (err) {
-      setEngineStatus({ vit: 'OFFLINE', c2pa: 'OFFLINE' });
+      setEngineStatus({ vit: 'OFFLINE', c2pa: 'OFFLINE', audio: 'OFFLINE' });
     }
   }, []);
 
@@ -297,7 +323,7 @@ export default function App() {
         )}
 
         {isUploading && file && activeCase && (
-          <IngestionPipeline file={file} activeCase={activeCase} useVit={useVit} useC2pa={useC2pa} onComplete={handleUploadComplete} onError={handleUploadError} />
+          <IngestionPipeline file={file} activeCase={activeCase} useVit={useVit} useC2pa={useC2pa} useAudio={useAudio} onComplete={handleUploadComplete} onError={handleUploadError} />
         )}
       </div>
 
@@ -377,32 +403,59 @@ export default function App() {
 
                   <div style={{ display: 'flex', flexDirection: selectedEvidence ? 'column' : 'row', alignItems: selectedEvidence ? 'flex-start' : 'center', gap: '16px', marginTop: '0', width: selectedEvidence ? '100%' : 'auto' }}>
                     <div className="mono" style={{ display: 'flex', gap: '16px', fontSize: '10px', color: 'var(--text-faint)' }}>
-                      <label className="hover-bright" style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: useVit ? 'var(--text-main)' : 'var(--text-muted)' }}>
-                        <input type="checkbox" checked={useVit} onChange={e => setUseVit(e.target.checked)} style={{ accentColor: 'var(--text-main)', cursor: 'pointer' }} />
+                      <label className="hover-bright" style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: stagedIsAudio === true ? 'not-allowed' : 'pointer', color: useVit ? 'var(--text-main)' : 'var(--text-muted)', opacity: stagedIsAudio === true ? 0.3 : 1, transition: 'opacity 0.2s' }}>
+                        <input type="checkbox" checked={useVit} disabled={stagedIsAudio === true} onChange={e => setUseVit(e.target.checked)} style={{ accentColor: 'var(--text-main)', cursor: stagedIsAudio === true ? 'not-allowed' : 'pointer' }} />
                         ViT-CORE
                       </label>
-                      <label className="hover-bright" style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: useC2pa ? 'var(--text-main)' : 'var(--text-muted)' }}>
-                        <input type="checkbox" checked={useC2pa} onChange={e => setUseC2pa(e.target.checked)} style={{ accentColor: 'var(--text-main)', cursor: 'pointer' }} />
+                      <label className="hover-bright" style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: stagedIsAudio === true ? 'not-allowed' : 'pointer', color: useC2pa ? 'var(--text-main)' : 'var(--text-muted)', opacity: stagedIsAudio === true ? 0.3 : 1, transition: 'opacity 0.2s' }}>
+                        <input type="checkbox" checked={useC2pa} disabled={stagedIsAudio === true} onChange={e => setUseC2pa(e.target.checked)} style={{ accentColor: 'var(--text-main)', cursor: stagedIsAudio === true ? 'not-allowed' : 'pointer' }} />
                         C2PA VERIFY
+                      </label>
+                      <label className="hover-bright" style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: stagedIsAudio === false ? 'not-allowed' : 'pointer', color: useAudio ? 'var(--text-main)' : 'var(--text-muted)', opacity: stagedIsAudio === false ? 0.3 : 1, transition: 'opacity 0.2s' }}>
+                        <input type="checkbox" checked={useAudio} disabled={stagedIsAudio === false} onChange={e => setUseAudio(e.target.checked)} style={{ accentColor: 'var(--text-main)', cursor: stagedIsAudio === false ? 'not-allowed' : 'pointer' }} />
+                        AUDIO
                       </label>
                     </div>
 
-                    <div style={{ width: selectedEvidence ? '100%' : 'auto' }}>
-                      <input type="file" id="file-upload" style={{ display: 'none' }} onChange={(e) => { if(e.target.files?.[0]) { setFile(e.target.files[0]); setIsUploading(true); } }} />
-                      <button 
-                        className="hover-bright mono" 
-                        disabled={!useVit && !useC2pa}
-                        onClick={() => document.getElementById('file-upload')?.click()} 
-                        style={{ 
-                          width: selectedEvidence ? '100%' : 'auto',
-                          padding: '8px 16px', background: 'transparent', color: (!useVit && !useC2pa) ? 'var(--text-muted)' : 'var(--text-main)', 
-                          border: '1px solid', borderColor: (!useVit && !useC2pa) ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.2)', 
-                          borderRadius: '4px', fontWeight: 500, fontSize: '11px', letterSpacing: '0.1em', cursor: (!useVit && !useC2pa) ? 'not-allowed' : 'pointer',
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        ＋ INGEST
-                      </button>
+                    <div style={{ width: selectedEvidence ? '100%' : 'auto', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <input type="file" id="file-upload" style={{ display: 'none' }} onChange={(e) => { if(e.target.files?.[0]) { setFile(e.target.files[0]); } }} />
+                      {!file ? (
+                        <button 
+                          className="hover-bright mono" 
+                          disabled={!useVit && !useC2pa && !useAudio}
+                          onClick={() => document.getElementById('file-upload')?.click()} 
+                          style={{ 
+                            width: selectedEvidence ? '100%' : 'auto',
+                            padding: '8px 16px', background: 'transparent', color: (!useVit && !useC2pa && !useAudio) ? 'var(--text-muted)' : 'var(--text-main)', 
+                            border: '1px solid', borderColor: (!useVit && !useC2pa && !useAudio) ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.2)', 
+                            borderRadius: '4px', fontWeight: 500, fontSize: '11px', letterSpacing: '0.1em', cursor: (!useVit && !useC2pa && !useAudio) ? 'not-allowed' : 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          ＋ INGEST
+                        </button>
+                      ) : (
+                        <>
+                          <span className="mono" style={{ fontSize: '10px', color: 'var(--text-faint)', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={file.name}>
+                            {file.name}
+                          </span>
+                          <button
+                            className="hover-bright mono"
+                            onClick={() => setIsUploading(true)}
+                            style={{ padding: '8px 16px', background: 'transparent', color: 'var(--text-main)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '4px', fontWeight: 500, fontSize: '11px', letterSpacing: '0.1em', cursor: 'pointer', transition: 'all 0.2s' }}
+                          >
+                            CONFIRM
+                          </button>
+                          <button
+                            className="hover-bright mono"
+                            onClick={() => setFile(null)}
+                            style={{ padding: '8px 10px', background: 'transparent', color: 'var(--text-faint)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', fontSize: '11px', cursor: 'pointer' }}
+                            title="Cancel, pick a different file"
+                          >
+                            ✕
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -424,8 +477,10 @@ export default function App() {
                           const isActive = selectedEvidence?.id === item.id;
                           
                           const issuer = item.ai_report?.c2pa_data?.issuer || 'Unknown Publisher';
-                          const vitRan = item.ai_report?.deepfake_probability !== null;
+                          const vitRan = item.ai_report?.deepfake_probability !== null && item.ai_report?.deepfake_probability !== undefined;
                           const c2paRan = item.ai_report?.c2pa_data?.raw_status !== "Bypassed by User";
+                          const audioRan = item.ai_report?.audio_spoof_probability !== null && item.ai_report?.audio_spoof_probability !== undefined;
+                          const audioIsSpoof = item.ai_report?.platform_status === 'SPOOF_DETECTED';
                           const c2paVerified = item.ai_report?.c2pa_data?.is_signed === true;
 
                           const platformStatus = item.ai_report?.platform_status;
@@ -468,6 +523,7 @@ export default function App() {
                                      <span>•</span>
                                      <span style={{ color: vitRan ? 'var(--text-muted)' : 'var(--text-faint)' }}>ViT {vitRan ? '✓' : '-'}</span>
                                      <span style={{ color: c2paRan ? (c2paVerified ? 'var(--text-muted)' : 'var(--text-faint)') : 'var(--text-faint)' }}>C2PA {c2paRan ? (c2paVerified ? '✓' : '✕') : '-'}</span>
+                                     <span style={{ color: audioRan ? (audioIsSpoof ? 'var(--c-crit)' : 'var(--text-muted)') : 'var(--text-faint)' }}>AUDIO {audioRan ? (audioIsSpoof ? '✕' : '✓') : '-'}</span>
                                    </div>
                                 )}
                               </div>
@@ -530,6 +586,9 @@ export default function App() {
             </div>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               C2PA <span style={{ color: engineStatus.c2pa === 'ONLINE' ? '#10b981' : 'var(--c-crit)', fontWeight: 600 }}>{engineStatus.c2pa}</span>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              AUDIO <span style={{ color: engineStatus.audio === 'ONLINE' ? '#10b981' : 'var(--c-crit)', fontWeight: 600 }}>{engineStatus.audio}</span>
             </div>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               QUEUE <span style={{ color: 'var(--text-main)' }}>{activeQueueCount}</span>

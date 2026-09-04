@@ -118,21 +118,23 @@ async def health_check(request: Request):
     # 2. Resolve network addresses for external forensic microservices
     vit_host, vit_port = get_host_port("VIT_CORE_URL", "http://host.docker.internal:8001/api/v1/analyze")
     c2pa_host, c2pa_port = get_host_port("C2PA_URL", "http://host.docker.internal:8002/api/v1/verify")
+    audio_host, audio_port = get_host_port("AUDIO_URL", "http://host.docker.internal:8003/api/v1/analyze")
     
     # 3. Perform network reachability checks concurrently if the internal loop is alive
     if worker_running:
-        vit_online, c2pa_online = await asyncio.gather(
+        vit_online, c2pa_online, audio_online = await asyncio.gather(
             is_service_reachable(vit_host, vit_port),
-            is_service_reachable(c2pa_host, c2pa_port)
+            is_service_reachable(c2pa_host, c2pa_port),
+            is_service_reachable(audio_host, audio_port)
         )
     else:
         # Force offline metrics if our local orchestration loop has crashed
-        vit_online, c2pa_online = False, False
+        vit_online, c2pa_online, audio_online = False, False, False
 
     # 4. Synthesize system operational flags
     if not worker_running:
         system_status = "offline"
-    elif not vit_online or not c2pa_online:
+    elif not vit_online or not c2pa_online or not audio_online:
         system_status = "degraded"
     else:
         system_status = "operational"
@@ -142,5 +144,6 @@ async def health_check(request: Request):
         "platform": "Veritas Nexus",
         "internal_worker": "RUNNING" if worker_running else "CRASHED_OR_STOPPED",
         "vit_status": "ONLINE" if vit_online else "OFFLINE",
-        "c2pa_status": "ONLINE" if c2pa_online else "OFFLINE"
+        "c2pa_status": "ONLINE" if c2pa_online else "OFFLINE",
+        "audio_status": "ONLINE" if audio_online else "OFFLINE"
     }

@@ -51,14 +51,33 @@ export const EvidenceAPI = {
     return Array.isArray(data) ? data : (data.evidence || []);
   },
 
+  // <img>/<audio> src attributes can't send custom headers (a fundamental
+  // browser limitation, not something fixable client-side any other way),
+  // so the raw /download|/heatmap|/attention URLs can never authenticate
+  // against get_current_user's Authorization-header-only check. This
+  // fetches the file properly authenticated and hands back a local blob:
+  // URL instead - the caller is responsible for URL.revokeObjectURL()ing
+  // it once done, or it leaks memory for the life of the page.
+  fetchMediaBlob: async (evidenceId: string, kind: 'download' | 'heatmap' | 'attention'): Promise<string> => {
+    const response = await fetch(`${API_BASE_URL}/api/v1/evidence/${evidenceId}/${kind}`, { headers: authHeaders() });
+    if (!response.ok) throw new Error(`Failed to load ${kind} (status ${response.status})`);
+    const blob = await response.blob();
+    return URL.createObjectURL(blob);
+  },
+
+
   checkHealth: async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/v1/health`);
       if (!response.ok) throw new Error('Health check failed');
       const data = await response.json();
-      return { vit: data.vit_status || 'OFFLINE', c2pa: data.c2pa_status || 'OFFLINE' };
+      return {
+        vit: data.vit_status || 'OFFLINE',
+        c2pa: data.c2pa_status || 'OFFLINE',
+        audio: data.audio_status || 'OFFLINE',
+      };
     } catch (err) {
-      return { vit: 'OFFLINE', c2pa: 'OFFLINE' };
+      return { vit: 'OFFLINE', c2pa: 'OFFLINE', audio: 'OFFLINE' };
     }
   },
 
@@ -112,7 +131,7 @@ export const EvidenceAPI = {
     return true;
   },
 
-  uploadPayload: async (file: File, caseId: string, useVit: boolean = true, useC2pa: boolean = true) => {
+  uploadPayload: async (file: File, caseId: string, useVit: boolean = true, useC2pa: boolean = true, useAudio: boolean = true) => {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("case_id", caseId);
@@ -120,6 +139,7 @@ export const EvidenceAPI = {
     // FASTAPI requires these as strings in the form data
     formData.append("use_vit", String(useVit));
     formData.append("use_c2pa", String(useC2pa));
+    formData.append("use_audio", String(useAudio));
 
     const response = await fetch(`${API_BASE_URL}/api/v1/evidence/`, {
       method: 'POST',

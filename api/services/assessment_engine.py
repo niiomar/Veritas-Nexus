@@ -189,3 +189,68 @@ def evaluate_assessment(ai_report: Dict[str, Any], exif: Optional[Dict[str, Any]
         ],
         "totalScore": total_score,
     }
+
+
+def evaluate_audio_assessment(ai_report: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Audio's analogue of evaluate_assessment() above — deliberately NOT a
+    call into that function. Its six domains (Cryptographic Provenance,
+    Metadata/EXIF, Structural/ELA, Chain of Custody, Contextual/pHash)
+    are all image/video-specific concepts with no audio equivalent, and
+    it reads ai_report["deepfake_probability"], not
+    ai_report["audio_spoof_probability"] — calling it for audio evidence
+    would silently score every domain on its "no data" fallback and
+    produce a verdict disconnected from the actual spoof-probability
+    result.
+
+    Verdict/type come directly from platform_status (already the output
+    of worker.py's tuned, audio-specific thresholds in
+    compute_audio_disposition) rather than being re-derived from a
+    totalScore the way the image version does — that threshold decision
+    is already made by the time this runs.
+    """
+    if ai_report.get("platform_status") == "REJECTED":
+        return {
+            "verdict": "REJECTED", "conf": "N/A", "type": "neutral",
+            "msg": "System Gatekeeper Activated", "policy": "Format Rejection",
+            "domains": [], "totalScore": 0,
+        }
+
+    prob = ai_report.get("audio_spoof_probability")
+    status = ai_report.get("platform_status")
+
+    if prob is None:
+        return {
+            "verdict": "UNKNOWN", "conf": "N/A", "type": "neutral",
+            "msg": "Audio engine unavailable", "policy": "Audio_Spoof_v1.0",
+            "domains": [{
+                "name": "Neural Audio Authenticity", "score": 0, "max": 100, "weight": 100,
+                "evidence": [{"text": "Audio Neural Engine offline or bypassed", "effect": "Neutral", "pts": 0}],
+            }],
+            "totalScore": 0,
+        }
+
+    # Higher score = more bonafide-like — same "higher is cleaner"
+    # convention evaluate_assessment() uses for totalScore, just derived
+    # directly from the spoof probability rather than summed domain points.
+    total_score = round((1 - prob) * 100, 1)
+
+    if status == "SPOOF_DETECTED":
+        verdict, kind, msg = "CRITICAL", "crit", "Synthetic Audio Detected"
+        evidence_text, effect = f"Neural engine: {prob * 100:.1f}% spoof probability — high-confidence synthesis artifacts", "Negative"
+    elif status == "REVIEW_REQUIRED":
+        verdict, kind, msg = "INCONCLUSIVE", "review", "Possible Synthetic Artifacts"
+        evidence_text, effect = f"Neural engine: {prob * 100:.1f}% spoof probability — inconclusive, manual review recommended", "Warning"
+    else:  # BONAFIDE_VERIFIED
+        verdict, kind, msg = "VERIFIED", "trust", "Authenticity Established"
+        evidence_text, effect = f"Neural engine: {prob * 100:.1f}% spoof probability — consistent with genuine human speech", "Positive"
+
+    return {
+        "verdict": verdict, "conf": f"{total_score:.1f}", "type": kind, "msg": msg,
+        "policy": "Audio_Spoof_v1.0",
+        "domains": [{
+            "name": "Neural Audio Authenticity", "score": total_score, "max": 100, "weight": 100,
+            "evidence": [{"text": evidence_text, "effect": effect, "pts": total_score}],
+        }],
+        "totalScore": total_score,
+    }
