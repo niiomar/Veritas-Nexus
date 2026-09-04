@@ -263,7 +263,13 @@ def fetch_visual_from_microservice(file_path: str, visual_type: str) -> bytes:
             raise RuntimeError(f"ViT-CORE rejected request: HTTP {response.status_code} - {response.text}")
         
         data = response.json()
-        maps = data.get("explainability_maps", [])
+        # explainability_maps stays a flat list of heatmap-only base64
+        # strings (VIT-CORE-FORENSICS's own standalone frontend embeds it
+        # directly, see that repo's app.js) - explainability_visuals is
+        # the field actually meant for this per-type extraction, added
+        # alongside it specifically so heatmap/attention/patches are each
+        # addressable, without changing the other field's contract.
+        maps = data.get("explainability_visuals", [])
         raw_b64 = None
         
         if isinstance(maps, list) and len(maps) > 0:
